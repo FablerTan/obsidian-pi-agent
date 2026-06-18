@@ -103,8 +103,10 @@ export class PiChatView extends ItemView {
         });
         const textarea = this.textarea;
 
-        // ── 笔记栏（笔记名 + 选中文本追踪） ──
+        // ── 笔记栏（笔记名 + 选中文本追踪，位于输入框上方） ──
         this.noteBar = new NoteBar(this.app, inputArea, textarea);
+        // 把笔记栏移到输入框前面
+        inputArea.insertBefore(this.noteBar.el, textarea);
 
         // ── 命令菜单（输入 / 时弹出） ──
         this.commandMenu = new CommandMenu(menuContainer, textarea, (cmd) => {

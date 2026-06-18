@@ -4,7 +4,7 @@ import { App, setIcon } from 'obsidian';
 
 export class NoteBar {
     // DOM 元素
-    private el: HTMLElement;               // 整条 note-bar
+    el: HTMLElement;                       // 整条 note-bar
     private nameEl: HTMLElement;           // 笔记名文字
     private toggleIcon: HTMLElement;       // 切换图标
     private selectionInfoEl: HTMLElement;  // 选中字数
