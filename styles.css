@@ -360,6 +360,7 @@ If your plugin does not need CSS, delete this file.
     white-space: pre-wrap;
     word-break: break-word;
     user-select: text;         /* 允许选中复制 */
+    flex-shrink: 0;            /* 不被 flex 压缩，按实际内容高度显示 */
 }
 
 .pi-chat-msg-assistant {
@@ -370,6 +371,7 @@ If your plugin does not need CSS, delete this file.
     width: auto;
     word-break: break-word;
     user-select: text;
+    flex-shrink: 0;            /* 不被 flex 压缩 */
 }
 
 /* ── 系统通知消息（/reload 等） ───────────── */
@@ -380,6 +382,7 @@ If your plugin does not need CSS, delete this file.
     overflow: hidden;
     font-size: var(--font-ui-small);
     margin-bottom: 8px;
+    flex-shrink: 0;            /* 不被 flex 压缩，reload 命令列表才能完整显示 */
 }
 
 .pi-msg-system-header {
