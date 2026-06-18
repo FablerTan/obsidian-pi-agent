@@ -1,25 +1,25 @@
+// 设置接口、默认值和设置页面
 import { App, PluginSettingTab, Setting } from 'obsidian';
-import MyPlugin from './main';
+import PiChatPlugin from './main';
 
-export interface MyPluginSettings {
+export interface PiChatSettings {
 	mySetting: string;
 }
 
-export const DEFAULT_SETTINGS: MyPluginSettings = {
+export const DEFAULT_SETTINGS: PiChatSettings = {
 	mySetting: 'default',
 };
 
-export class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+export class PiChatSettingTab extends PluginSettingTab {
+	plugin: PiChatPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: PiChatPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
 	display(): void {
 		const { containerEl } = this;
-
 		containerEl.empty();
 
 		new Setting(containerEl)

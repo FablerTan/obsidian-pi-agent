@@ -1,11 +1,10 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
+	"id": "pi-chat",
+	"name": "Pi Chat",
 	"version": "1.0.0",
 	"minAppVersion": "1.0.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
-	"isDesktopOnly": false
+	"description": "在 Obsidian 中和 Pi（终端 AI 编程助手）聊天的面板插件",
+	"author": "Your Name",
+	"authorUrl": "",
+	"isDesktopOnly": true
 }

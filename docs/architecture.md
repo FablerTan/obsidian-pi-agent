@@ -256,9 +256,9 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 
 | 导出 | 说明 |
 |------|------|
-| `MyPluginSettings` | 设置接口（当前为占位） |
+| `PiChatSettings` | 设置接口 |
 | `DEFAULT_SETTINGS` | 默认配置 |
-| `SampleSettingTab` | 设置页面，继承 `PluginSettingTab` |
+| `PiChatSettingTab` | 设置页面，继承 `PluginSettingTab` |
 
 ---
 
