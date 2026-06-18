@@ -1,15 +1,14 @@
-// 导入 Obsidian 的 ItemView 基类
-// ItemView: 可以在 Obsidian 工作区中创建自定义面板
-// WorkspaceLeaf: 每个视图都挂在一个"叶子"上
-import { ItemView, WorkspaceLeaf, Notice, setIcon, FileSystemAdapter } from 'obsidian';
+// 聊天面板核心视图
+// 负责：面板生命周期、消息流（用户输入 + AI 回复）、加载动画、命令菜单、历史面板
+import { ItemView, WorkspaceLeaf, Notice, setIcon } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 import { HistoryPanel } from './HistoryPanel';
 import { MarkdownMsg } from './MarkdownMsg';
 import { ToolCallMsg } from './ToolCallMsg';
 import { CommandMenu } from './CommandMenu';
 import { InputStatusBar } from './InputStatusBar';
-import * as fs from 'fs';
-import * as path from 'path';
+import { NoteBar } from './NoteBar';
+import { WelcomePage } from './WelcomePage';
 
 // 视图的唯一标识符，用来注册和查找这个视图
 export const PI_CHAT_VIEW_TYPE = 'pi-chat-view';
@@ -18,8 +17,8 @@ export class PiChatView extends ItemView {
     // 消息列表容器
     messagesEl!: HTMLDivElement;
 
-    // 欢迎页元素（首次对话前显示，发消息后移除）
-    private welcomeEl!: HTMLElement;
+    // 欢迎页
+    private welcomePage!: WelcomePage;
 
     // 加载动画元素（发送消息后、收到回复前显示）
     private loadingEl: HTMLDivElement | null = null;
@@ -42,23 +41,14 @@ export class PiChatView extends ItemView {
     // 底部状态栏（模型 + 思考层级）
     private inputStatusBar!: InputStatusBar;
 
+    // 笔记栏（笔记名 + 选中文本追踪）
+    private noteBar!: NoteBar;
+
     // 输入框
     private textarea!: HTMLTextAreaElement;
 
     // 5 秒超时保护定时器
     private loadingTimeout: number | null = null;
-
-    // ── 当前笔记追踪 ──
-    private currentNotePath: string | null = null;
-    private currentNoteName: string | null = null;
-    private noteAttached = false;               // 是否发送笔记地址给 pi
-    private noteBarEl!: HTMLElement;             // 笔记名显示栏
-    private noteNameEl!: HTMLElement;            // 笔记名文字
-    private noteToggleIcon!: HTMLElement;        // 切换图标
-
-    // ── 选中文本追踪 ──
-    private selectedText = '';                    // 当前选中的文本
-    private selectionInfoEl!: HTMLElement;         // 选中字数显示元素
 
     // RPC 客户端
     private piClient: PiRpcClient;
@@ -73,17 +63,9 @@ export class PiChatView extends ItemView {
         };
     }
 
-    getViewType(): string {
-        return PI_CHAT_VIEW_TYPE;
-    }
-
-    getDisplayText(): string {
-        return 'Pi Chat';
-    }
-
-    getIcon(): string {
-        return 'pi-logo';
-    }
+    getViewType(): string { return PI_CHAT_VIEW_TYPE; }
+    getDisplayText(): string { return 'Pi Chat'; }
+    getIcon(): string { return 'pi-logo'; }
 
     // ── 构建 UI ──────────────────────────────────
     async onOpen(): Promise<void> {
@@ -102,8 +84,8 @@ export class PiChatView extends ItemView {
 
         // 消息列表
         const messagesEl = container.createDiv({ cls: 'pi-chat-messages' });
-        this.welcomeEl = this.createWelcomeEl(messagesEl);
-        this.loadWelcomeData();
+        this.welcomePage = new WelcomePage(messagesEl, this.app, this.piClient);
+        this.welcomePage.loadData();
 
         // 历史会话管理器（通过 /history 命令触发）
         this.historyPanel = new HistoryPanel(this.piClient, messagesEl, contentEl, this.app);
@@ -111,18 +93,8 @@ export class PiChatView extends ItemView {
         // ── 输入区域（自动撑到最底部） ──
         const inputArea = container.createDiv({ cls: 'pi-chat-input-area' });
 
-        // ── 命令菜单容器（在 DOM 中位于输入框正上方，靠文档流排列） ──
+        // ── 命令菜单容器 ──
         const menuContainer = inputArea.createDiv({ cls: 'pi-command-menu' });
-
-        // ── 当前笔记栏（显示笔记名 + 选中字数，点击笔记名切换是否发送笔记地址） ──
-        this.noteBarEl = inputArea.createDiv({ cls: 'pi-chat-note-bar' });
-        const noteLeft = this.noteBarEl.createSpan({ cls: 'pi-chat-note-left' });
-        this.noteToggleIcon = noteLeft.createSpan({ cls: 'pi-chat-note-icon' });
-        this.noteNameEl = noteLeft.createSpan({ cls: 'pi-chat-note-name', text: '无活动笔记' });
-        noteLeft.addEventListener('click', () => this.toggleNoteAttach());
-        this.updateNoteIcon();
-        // 选中字数（右边）
-        this.selectionInfoEl = this.noteBarEl.createSpan({ cls: 'pi-chat-selection-info' });
 
         // 输入框
         this.textarea = inputArea.createEl('textarea', {
@@ -130,6 +102,9 @@ export class PiChatView extends ItemView {
             placeholder: '输入消息... (Enter 发送, Shift+Enter 换行)',
         });
         const textarea = this.textarea;
+
+        // ── 笔记栏（笔记名 + 选中文本追踪） ──
+        this.noteBar = new NoteBar(this.app, inputArea, textarea);
 
         // ── 命令菜单（输入 / 时弹出） ──
         this.commandMenu = new CommandMenu(menuContainer, textarea, (cmd) => {
@@ -145,11 +120,6 @@ export class PiChatView extends ItemView {
             }
         });
 
-        // 在焦点转移前抓取一次选区（点击输入框时编辑器还未失焦）
-        textarea.addEventListener('mousedown', () => {
-            this.captureSelectionBeforeFocusLost();
-        });
-
         // 输入变化时检测 / 命令
         textarea.addEventListener('input', () => {
             const val = textarea.value;
@@ -163,12 +133,10 @@ export class PiChatView extends ItemView {
 
         // Enter 发送，Shift+Enter 换行，Esc 打断
         textarea.addEventListener('keydown', (e) => {
-            // 如果命令菜单开着，优先让菜单处理键盘事件（IME 组词中不拦截）
             if (this.commandMenu.isVisible() && !e.isComposing) {
                 const handled = this.commandMenu.handleKeydown(e);
                 if (handled) return;
             }
-            // Esc 打断 AI 输出
             if (e.key === 'Escape' && (this.loadingEl || this.currentMarkdown || this.toolCalls.size > 0)) {
                 e.preventDefault();
                 this.abort();
@@ -179,18 +147,11 @@ export class PiChatView extends ItemView {
                 const msg = textarea.value.trim();
                 if (!msg) return;
 
-                // 如果开启了笔记附加，将笔记地址加在消息前面
-                let finalMsg = msg;
-                const parts: string[] = [];
-                if (this.noteAttached && this.currentNotePath) {
-                    parts.push(`[当前笔记: ${this.currentNotePath}]`);
-                }
-                if (this.selectedText) {
-                    parts.push(`[选中文本 (${this.selectedText.length} 字)]\n\n${this.selectedText}`);
-                }
-                if (parts.length > 0) {
-                    finalMsg = parts.join('\n\n') + '\n\n' + msg;
-                }
+                // 组装上下文 + 消息
+                const parts = this.noteBar.getContextParts();
+                const finalMsg = parts.length > 0
+                    ? parts.join('\n\n') + '\n\n' + msg
+                    : msg;
 
                 this.addUserMessage(msg);
                 textarea.value = '';
@@ -213,45 +174,20 @@ export class PiChatView extends ItemView {
 
         this.messagesEl = messagesEl;
 
-        // 预加载命令列表（首次 / 时不用等待）
+        // 预加载命令列表
         this.loadCommands();
-
-        // ── 监听当前活动笔记变化 ──
-        this.registerEvent(
-            this.app.workspace.on('file-open', (_file: any) => {
-                this.updateCurrentNote();
-            }),
-        );
-        // 初始加载当前笔记
-        this.updateCurrentNote();
-
-        // ── 监听编辑器变化（内容改变时刷新选中文本） ──
-        this.registerEvent(
-            this.app.workspace.on('editor-change', (_editor: any) => {
-                // 编辑器内容改变 → 用户操作了编辑器 → 无选中时清空
-                this.updateSelectedText(true);
-            }),
-        );
-        // 鼠标松开时也刷新（无内容变化的纯选择）
-        // 点击编辑器内移动光标 → 取消选中；点击外面 → 保留选中
-        this.app.workspace.containerEl.addEventListener('mouseup', (e: MouseEvent) => {
-            const target = e.target as HTMLElement;
-            const inEditor = !!target.closest('.cm-editor, .markdown-source-view');
-            this.updateSelectedText(inEditor);
-        });
-        // 初始检查选中文本
-        this.updateSelectedText();
     }
 
     async onClose(): Promise<void> {
         this.piClient.onEvent = null;
+        this.noteBar?.destroy();
     }
 
     // ── 添加用户消息 ──────────────────────────
     addUserMessage(text: string): void {
-        if (this.welcomeEl) {
-            this.welcomeEl.remove();
-            this.welcomeEl = null as any;
+        if (this.welcomePage) {
+            this.welcomePage.remove();
+            this.welcomePage = null as any;
         }
         const msgEl = this.messagesEl.createDiv({ cls: 'pi-chat-msg-user' });
         msgEl.setText(text);
@@ -263,14 +199,11 @@ export class PiChatView extends ItemView {
         this.hideLoading();
 
         if (!this.currentMarkdown) {
-            // 获取或创建助手消息气泡
             this.currentAssistantEl = this.getOrCreateAssistantEl();
-            // MarkdownMsg 只操作文字子容器，不影响同级的工具卡片
             const textEl = this.currentAssistantEl.createDiv({ cls: 'pi-chat-msg-assistant-text' });
             this.currentMarkdown = new MarkdownMsg(this.app, textEl, this);
         }
 
-        // 追加文字并渲染
         this.currentMarkdown.append(text);
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     }
@@ -307,18 +240,14 @@ export class PiChatView extends ItemView {
                 if (delta.type === 'text_delta') {
                     this.appendAssistantText(delta.delta);
                 }
-                // 模型开始使用工具（无文字回复时），隐藏加载动画
                 if (delta.type === 'toolcall_start' && this.loadingEl) {
                     this.hideLoading();
                 }
                 break;
             }
-            // ── 工具开始执行 ──
             case 'tool_execution_start': {
                 this.hideLoading();
-                // 关闭当前 MarkdownMsg，后续文字会创建新的 textEl 排在工具卡片后面
                 this.currentMarkdown = null;
-                // 工具卡片放进同一个助手气泡（和文字在一起）
                 this.currentAssistantEl = this.getOrCreateAssistantEl();
                 const toolEl = this.currentAssistantEl.createDiv({ cls: 'pi-chat-tool-wrapper' });
                 const card = new ToolCallMsg(toolEl, event.toolName, event.args);
@@ -326,19 +255,15 @@ export class PiChatView extends ItemView {
                 this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
                 break;
             }
-            // ── 工具执行进度（流式输出） ──
             case 'tool_execution_update': {
                 const card = this.toolCalls.get(event.toolCallId);
                 if (card) {
                     const text = this.extractTextFromContent(event.partialResult?.content);
-                    if (text) {
-                        card.setOutput(text);
-                    }
+                    if (text) card.setOutput(text);
                     this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
                 }
                 break;
             }
-            // ── 工具执行完成 ──
             case 'tool_execution_end': {
                 const card = this.toolCalls.get(event.toolCallId);
                 if (card) {
@@ -349,7 +274,6 @@ export class PiChatView extends ItemView {
                 break;
             }
             case 'agent_end': {
-                // 回复完成，重置所有状态
                 this.currentMarkdown = null;
                 this.currentAssistantEl = null;
                 this.toolCalls.clear();
@@ -368,20 +292,15 @@ export class PiChatView extends ItemView {
     }
 
     // ── 获取或创建助手消息气泡 ────────────────
-    // 找消息列表中最后一个 .pi-chat-msg-assistant，
-    // 如果当前 agent run 还没有气泡则新建一个
     private getOrCreateAssistantEl(): HTMLElement {
-        // 优先用缓存的
         if (this.currentAssistantEl && this.messagesEl.contains(this.currentAssistantEl)) {
             return this.currentAssistantEl;
         }
-        // 找消息列表最后一个助手气泡
         const last = this.messagesEl.querySelector('.pi-chat-msg-assistant:last-child') as HTMLElement | null;
         if (last) {
             this.currentAssistantEl = last;
             return last;
         }
-        // 一个都没有，新建
         const el = this.messagesEl.createDiv({ cls: 'pi-chat-msg-assistant' });
         this.currentAssistantEl = el;
         return el;
@@ -392,7 +311,6 @@ export class PiChatView extends ItemView {
         try {
             const resp = await this.piClient.sendAndWait({ type: 'get_commands' });
             if (resp?.success && resp.data?.commands) {
-                // 在前面加上内置命令（不走 text prompt，直接发 RPC）
                 const builtins = [
                     { name: 'new', description: '新建会话', source: 'extension' as const },
                     { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
@@ -400,9 +318,7 @@ export class PiChatView extends ItemView {
                 ];
                 this.commandMenu.setCommands([...builtins, ...resp.data.commands]);
             }
-        } catch {
-            // pi 还未就绪，忽略
-        }
+        } catch { /* pi 还未就绪，忽略 */ }
     }
 
     // ── 处理 /new ──────────────────────────────
@@ -414,14 +330,12 @@ export class PiChatView extends ItemView {
         try {
             const resp = await this.piClient.sendAndWait({ type: 'new_session' });
             if (resp?.success) {
-                // 清空消息列表
                 this.messagesEl.empty();
                 this.currentMarkdown = null;
                 this.currentAssistantEl = null;
                 this.toolCalls.clear();
-                // 重新显示欢迎页并加载数据
-                this.welcomeEl = this.createWelcomeEl(this.messagesEl);
-                this.loadWelcomeData();
+                this.welcomePage = new WelcomePage(this.messagesEl, this.app, this.piClient);
+                this.welcomePage.loadData();
                 new Notice('已创建新会话');
             } else {
                 new Notice('新建会话失败');
@@ -433,13 +347,9 @@ export class PiChatView extends ItemView {
 
     // ── 打断 AI 输出 ──────────────────────────
     private abort(): void {
-        // 清除超时定时器
         this.clearLoadingTimeout();
-        // 关闭命令菜单（如果开着）
         this.commandMenu.hide();
-        // 发送 abort RPC
         this.piClient.send({ type: 'abort' });
-        // 重置 UI 状态
         this.hideLoading();
         this.currentMarkdown = null;
         this.currentAssistantEl = null;
@@ -454,85 +364,6 @@ export class PiChatView extends ItemView {
         this.historyPanel.open();
     }
 
-    // ── 切换是否发送笔记地址 ──────────────────
-    private toggleNoteAttach(): void {
-        this.noteAttached = !this.noteAttached;
-        this.updateNoteIcon();
-    }
-
-    // ── 更新笔记栏图标状态 ────────────────────
-    private updateNoteIcon(): void {
-        this.noteBarEl.toggleClass('pi-chat-note-attached', this.noteAttached);
-        setIcon(this.noteToggleIcon, this.noteAttached ? 'pin' : 'pin-off');
-    }
-
-    // ── 从活动编辑器更新当前笔记 ──────────────
-    private updateCurrentNote(): void {
-        const file = this.app.workspace.getActiveFile();
-        if (file) {
-            // 切换到了不同的文件 → 清空上次选中
-            if (file.path !== this.currentNotePath) {
-                this.selectedText = '';
-            }
-            this.currentNotePath = file.path;
-            this.currentNoteName = file.name;
-            this.noteNameEl.setText(file.name);
-            this.noteBarEl.toggleClass('pi-chat-note-empty', false);
-        } else {
-            // 没有活动文件 → 清空笔记和选中
-            this.currentNotePath = null;
-            this.currentNoteName = null;
-            this.selectedText = '';
-            this.noteNameEl.setText('无活动笔记');
-            this.noteBarEl.toggleClass('pi-chat-note-empty', true);
-        }
-        this.updateSelectionDisplay();
-    }
-
-    // ── 在焦点转移前抓取选区 ──────────────────
-    private captureSelectionBeforeFocusLost(): void {
-        const editor = this.app.workspace.activeEditor?.editor;
-        if (editor) {
-            const sel = editor.getSelection();
-            if (sel) {
-                this.selectedText = sel;
-                this.updateSelectionDisplay();
-            }
-        }
-    }
-
-    // ── 刷新选中文本显示 ──────────────────────
-    // clickInEditor: true=点击在编辑器内部（移动光标应取消选中）
-    private updateSelectedText(clickInEditor = false): void {
-        const editor = this.app.workspace.activeEditor?.editor;
-        if (editor) {
-            const sel = editor.getSelection();
-            if (sel) {
-                this.selectedText = sel;
-            } else if (clickInEditor) {
-                // 用户点击了编辑器内部但没有选中 → 取消选中
-                this.selectedText = '';
-            }
-            // 点击编辑器外部且无选中 → 保留上次选中
-        }
-        // activeEditor 为 null 不处理，保留上次选中
-        this.updateSelectionDisplay();
-    }
-
-    // ── 更新选中文本 UI ───────────────────────
-    private updateSelectionDisplay(): void {
-        if (this.selectedText) {
-            const charCount = this.selectedText.length;
-            // 过滤掉完全空的行（末尾空行、中间空行都不计入）
-            const lineCount = this.selectedText.split('\n').filter(l => l.length > 0).length;
-            this.selectionInfoEl.setText(`「选中 ${lineCount} 行 ${charCount} 字」`);
-            this.selectionInfoEl.toggleClass('pi-chat-selection-active', true);
-        } else {
-            this.selectionInfoEl.setText('');
-            this.selectionInfoEl.toggleClass('pi-chat-selection-active', false);
-        }
-    }
-
     // ── 处理 /reload ──────────────────────────
     private async handleReload(): Promise<void> {
         this.clearLoadingTimeout();
@@ -540,109 +371,10 @@ export class PiChatView extends ItemView {
         this.commandMenu.hide();
         this.textarea.value = '';
         try {
-            // 尝试通过 prompt 发送 reload 命令
             this.piClient.prompt('/reload');
             new Notice('正在重新加载…');
         } catch {
             new Notice('重新加载失败');
-        }
-    }
-
-    // ── 创建欢迎页 ────────────────────────────
-    private createWelcomeEl(parent: HTMLElement): HTMLElement {
-        const el = parent.createDiv({ cls: 'pi-chat-welcome' });
-
-        // 标题
-        const title = el.createDiv({ cls: 'pi-welcome-title' });
-        const logo = title.createSpan({ cls: 'pi-welcome-logo' });
-        setIcon(logo, 'pi-logo');
-        title.createSpan({ text: 'Pi Chat' });
-
-        // 内容容器
-        el.createDiv({ cls: 'pi-welcome-sections' });
-
-        return el;
-    }
-
-    // ── 加载欢迎页数据 ──────────────────────────
-    private async loadWelcomeData(): Promise<void> {
-        const sectionsEl = this.welcomeEl?.querySelector('.pi-welcome-sections') as HTMLElement | null;
-        if (!sectionsEl) return;
-
-        // 并行获取上下文文件和命令列表
-        const [contextFiles, cmdResp] = await Promise.all([
-            this.readContextFiles(),
-            this.piClient.sendAndWait({ type: 'get_commands' }).catch(() => null),
-        ]);
-
-        // ── Context ──
-        if (contextFiles.length > 0) {
-            this.addSectionList(sectionsEl, 'file-text', 'Context', contextFiles);
-        }
-
-        if (cmdResp?.success && cmdResp.data?.commands) {
-            const cmds: any[] = cmdResp.data.commands;
-
-            // 按 source 分组
-            const groups = new Map<string, { items: string[] }>();
-            for (const c of cmds) {
-                const src = c.source || 'other';
-                if (!groups.has(src)) groups.set(src, { items: [] });
-                groups.get(src)!.items.push(c.name);
-            }
-
-            // 固定顺序 + 图标映射
-            const order: Array<{ key: string; icon: string; label: string }> = [
-                { key: 'extension', icon: 'puzzle', label: 'Extensions' },
-                { key: 'prompt', icon: 'file-plus', label: 'Prompts' },
-                { key: 'skill', icon: 'sparkles', label: 'Skills' },
-            ];
-            for (const { key, icon, label } of order) {
-                const g = groups.get(key);
-                if (g) {
-                    this.addSectionList(sectionsEl, icon, label, g.items);
-                    groups.delete(key);
-                }
-            }
-            // 剩余未知类型
-            for (const [key, g] of groups) {
-                this.addSectionList(sectionsEl, 'terminal', key, g.items);
-            }
-        }
-    }
-
-    // ── 读取上下文文件 ──────────────────────────
-    private async readContextFiles(): Promise<string[]> {
-        try {
-            const vaultPath = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
-            const agentDir = path.join(vaultPath, '.pi', 'agent');
-            const files = fs.readdirSync(agentDir);
-            return files
-                .filter(f => f.endsWith('.md') || f.endsWith('.txt'))
-                .sort();
-        } catch {
-            return [];
-        }
-    }
-
-    // ── 添加带图标和标题的列表区块 ────────────
-    private addSectionList(
-        parent: Element, icon: string, title: string, items: string[],
-    ): void {
-        if (items.length === 0) return;
-
-        const section = parent.createDiv({ cls: 'pi-welcome-section' });
-
-        // 标题行（图标 + 标题）
-        const titleRow = section.createDiv({ cls: 'pi-welcome-section-title' });
-        const iconEl = titleRow.createSpan({ cls: 'pi-welcome-section-icon' });
-        setIcon(iconEl, icon);
-        titleRow.createSpan({ cls: 'pi-welcome-section-label', text: title });
-
-        // 列表
-        const list = section.createEl('ul', { cls: 'pi-welcome-list' });
-        for (const item of items) {
-            list.createEl('li', { cls: 'pi-welcome-list-item', text: item });
         }
     }
 
