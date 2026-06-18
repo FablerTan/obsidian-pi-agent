@@ -20,6 +20,9 @@ export class PiChatView extends ItemView {
     // 加载动画元素（发送消息后、收到回复前显示）
     private loadingEl: HTMLDivElement | null = null;
 
+    // 是否已设置过会话名称（只在首次发消息时设置一次）
+    private sessionNamed = false;
+
     // RPC 客户端
     private piClient: PiRpcClient;
 
@@ -103,6 +106,14 @@ export class PiChatView extends ItemView {
 
                 // 发送给 pi
                 this.piClient.prompt(msg);
+
+                // 首次发消息时，用消息内容设置会话名称
+                // 这样历史列表里显示的是消息摘要，而不是时间戳
+                if (!this.sessionNamed) {
+                    this.sessionNamed = true;
+                    const name = msg.length > 30 ? msg.slice(0, 30) + '...' : msg;
+                    this.piClient.send({ type: 'set_session_name', name });
+                }
 
                 // 如果 pi 没响应，5 秒后移除加载动画
                 setTimeout(() => {
@@ -271,17 +282,47 @@ export class PiChatView extends ItemView {
         const sessions: Array<{ file: string; displayName: string }> = [];
         for (const f of files) {
             const filePath = path.join(fullDir, f);
-            let displayName = f;
+            let displayName: string;
+
             try {
-                const headerLine = fs.readFileSync(filePath, 'utf-8').split('\n')[0] || '';
-                const header = JSON.parse(headerLine);
+                const content = fs.readFileSync(filePath, 'utf-8');
+                const lines = content.split('\n');
+                const header = JSON.parse(lines[0] || '{}');
+
                 if (header.name) {
+                    // 有自定义名称，直接使用
                     displayName = header.name;
                 } else {
-                    const dateStr = f.split('_')[0] || f;
-                    displayName = dateStr.replace(/T/, ' ').replace(/-\d+Z$/, '');
+                    // 没有名称，尝试取第一条用户消息作为显示名
+                    let firstMsg = '';
+                    for (let i = 1; i < lines.length; i++) {
+                        try {
+                            const line = lines[i];
+                            if (!line) continue;
+                            const entry = JSON.parse(line);
+                            if (entry.type === 'message' && entry.message?.role === 'user') {
+                                const rawContent = entry.message.content;
+                                const text = rawContent ? extractTextContent(rawContent) : '';
+                                if (text) {
+                                    firstMsg = text.length > 40 ? text.slice(0, 40) + '...' : text;
+                                    break;
+                                }
+                            }
+                        } catch {}
+                    }
+
+                    if (firstMsg) {
+                        displayName = firstMsg;
+                    } else {
+                        // 连消息都没有，就显示时间
+                        const dateStr = f.split('_')[0] || f;
+                        displayName = dateStr.replace(/T/, ' ').replace(/-\d+Z$/, '');
+                    }
                 }
-            } catch {}
+            } catch {
+                displayName = f;
+            }
+
             sessions.push({ file: filePath, displayName });
         }
         return sessions;
