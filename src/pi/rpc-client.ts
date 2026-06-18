@@ -19,35 +19,57 @@ export class PiRpcClient {
     // 自增 ID 计数器
     private requestIdCounter = 0;
 
-    // ── 启动 pi 子进程 ──────────────────────────
-    start(cwd: string): void {
+    // ── 启动 pi 子进程（异步，等 pi 准备好后 resolve） ─
+    start(cwd: string): Promise<void> {
         console.log(`Starting pi RPC in ${cwd}`);
 
         // pi 的完整路径（macOS Homebrew 安装路径）
         const piPath = '/opt/homebrew/bin/pi';
 
-        // 不加 --no-session，让 pi 自动保存会话文件到 ~/.pi/agent/sessions/
         this.proc = spawn(piPath, ['--mode', 'rpc'], {
             cwd,
             stdio: ['pipe', 'pipe', 'pipe'],
         });
 
-        // 监听 stdout：pi 返回的事件流
-        this.proc.stdout?.on('data', (chunk: Buffer) => {
-            this.buffer += chunk.toString('utf-8');
-            this.processLines();
+        const readyPromise = new Promise<void>((resolve, reject) => {
+            if (!this.proc) {
+                reject(new Error('Failed to spawn pi'));
+                return;
+            }
+
+            // 监听 stdout：pi 返回的事件流
+            this.proc.stdout?.on('data', (chunk: Buffer) => {
+                this.buffer += chunk.toString('utf-8');
+                this.processLines();
+            });
+
+            // 监听 stderr：错误信息
+            this.proc.stderr?.on('data', (chunk: Buffer) => {
+                console.error('pi stderr:', chunk.toString());
+            });
+
+            // 监听进程退出
+            this.proc.on('exit', (code) => {
+                console.log(`pi exited with code ${code}`);
+                this.proc = null;
+                if (code !== 0) {
+                    reject(new Error(`pi exited with code ${code}`));
+                }
+            });
+
+            // 发送 get_state 确认 pi 已就绪
+            // 如果 10 秒内没响应，说明 pi 启动有问题
+            const timeout = setTimeout(() => {
+                reject(new Error('pi failed to respond within 10s'));
+            }, 10000);
+
+            this.sendAndWait({ type: 'get_state' }).then(() => {
+                clearTimeout(timeout);
+                resolve();
+            }).catch(reject);
         });
 
-        // 监听 stderr：错误信息
-        this.proc.stderr?.on('data', (chunk: Buffer) => {
-            console.error('pi stderr:', chunk.toString());
-        });
-
-        // 监听进程退出
-        this.proc.on('exit', (code) => {
-            console.log(`pi exited with code ${code}`);
-            this.proc = null;
-        });
+        return readyPromise;
     }
 
     // ── 停止 pi 子进程 ──────────────────────────

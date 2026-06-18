@@ -38,7 +38,9 @@ export default class MyPlugin extends Plugin {
 		this.piClient = new PiRpcClient();
 		// 获取 vault 根目录的实际路径，传给 pi 作为工作目录
 		const vaultPath = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
-		this.piClient.start(vaultPath);
+		this.piClient.start(vaultPath).catch((err) => {
+			new Notice('Pi 启动失败: ' + err.message);
+		});
 
 		// 注册聊天面板视图，把 piClient 传进去
 		this.registerView(

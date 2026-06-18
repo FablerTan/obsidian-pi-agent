@@ -103,6 +103,15 @@ export class PiChatView extends ItemView {
 
                 // 发送给 pi
                 this.piClient.prompt(msg);
+
+                // 如果 pi 没响应，5 秒后移除加载动画
+                setTimeout(() => {
+                    // 如果加载动画还在（说明没收到任何回复）
+                    if (this.loadingEl) {
+                        this.hideLoading();
+                        new Notice('Pi 没有响应，请检查 pi 是否正常运行');
+                    }
+                }, 5000);
             }
         });
 
