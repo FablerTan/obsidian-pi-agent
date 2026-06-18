@@ -86,6 +86,7 @@ export class WelcomePage {
     }
 
     // ── 添加区块 ────────────────────────────────
+    // 每组最多显示 3 项，超出用「+N more」省略
     private addSection(
         parent: Element, icon: string, title: string, items: string[],
     ): void {
@@ -95,11 +96,17 @@ export class WelcomePage {
         const titleRow = section.createDiv({ cls: 'pi-welcome-section-title' });
         const iconEl = titleRow.createSpan({ cls: 'pi-welcome-section-icon' });
         setIcon(iconEl, icon);
+        const count = titleRow.createSpan({ cls: 'pi-welcome-section-count', text: String(items.length) });
         titleRow.createSpan({ cls: 'pi-welcome-section-label', text: title });
 
         const list = section.createEl('ul', { cls: 'pi-welcome-list' });
-        for (const item of items) {
+        const shown = items.slice(0, 3);
+        for (const item of shown) {
             list.createEl('li', { cls: 'pi-welcome-list-item', text: item });
+        }
+        if (items.length > 3) {
+            const more = list.createEl('li', { cls: 'pi-welcome-list-more' });
+            more.setText(`+${items.length - 3} more`);
         }
     }
 

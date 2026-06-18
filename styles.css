@@ -273,6 +273,13 @@ If your plugin does not need CSS, delete this file.
 
 .pi-welcome-section-label {}
 
+.pi-welcome-section-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-faint);
+    font-weight: normal;
+}
+
 .pi-welcome-list {
     list-style: none;
     margin: 4px 0 0 0;
@@ -284,6 +291,13 @@ If your plugin does not need CSS, delete this file.
     font-size: 11px;
     padding: 1px 0;
     color: var(--text-muted);
+}
+
+.pi-welcome-list-more {
+    font-size: 11px;
+    padding: 1px 0;
+    color: var(--text-faint);
+    font-style: italic;
 }
 
 /* ── 顶部横条 ──────────────────────── */
