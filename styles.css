@@ -796,7 +796,7 @@ If your plugin does not need CSS, delete this file.
     background: var(--background-primary);
     overflow: hidden;
     font-size: var(--font-ui-small);
-    margin-top: 8px;
+    margin: 8px 0;
 }
 
 .pi-thinking-header {
