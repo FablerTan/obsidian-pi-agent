@@ -283,6 +283,11 @@ If your plugin does not need CSS, delete this file.
     background: none;
 }
 
+/* 隐藏 Obsidian 默认的代码块复制按钮 */
+.pi-chat-msg-assistant pre .copy-code-button {
+    display: none;
+}
+
 /* 语言标签（右上角，点击复制代码） */
 .pi-chat-code-lang {
     position: absolute;
