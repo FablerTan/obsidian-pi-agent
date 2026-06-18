@@ -11,6 +11,9 @@ export class PiChatView extends ItemView {
     // 消息列表容器
     messagesEl!: HTMLDivElement;
 
+    // 加载动画元素（发送消息后、收到回复前显示）
+    private loadingEl: HTMLDivElement | null = null;
+
     // RPC 客户端
     private piClient: PiRpcClient;
 
@@ -71,6 +74,9 @@ export class PiChatView extends ItemView {
                 // 清空输入框
                 textarea.value = '';
 
+                // 显示加载动画
+                this.showLoading();
+
                 // 发送给 pi
                 this.piClient.prompt(msg);
             }
@@ -87,9 +93,35 @@ export class PiChatView extends ItemView {
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     }
 
+    // ── 显示加载动画 ──────────────────────────
+    private showLoading(): void {
+        // 先移除旧的加载动画（如果有）
+        this.hideLoading();
+
+        this.loadingEl = this.messagesEl.createDiv({ cls: 'pi-chat-loading' });
+
+        // 三个跳动的小圆点
+        for (let i = 0; i < 3; i++) {
+            this.loadingEl.createEl('span', { cls: 'pi-chat-loading-dot' });
+        }
+
+        this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+    }
+
+    // ── 隐藏加载动画 ──────────────────────────
+    private hideLoading(): void {
+        if (this.loadingEl) {
+            this.loadingEl.remove();
+            this.loadingEl = null;
+        }
+    }
+
     // ── 追加一段 pi 的回复文字 ─────────────────
     // pi 的回复是一个字一个字流式到达的，所以要追加
     appendAssistantText(text: string): void {
+        // 有加载动画就先移除它（第一次收到文字时）
+        this.hideLoading();
+
         // 找最后一条 assistant 消息，没有就创建
         let lastMsg = this.messagesEl.querySelector('.pi-chat-msg-assistant:last-child') as HTMLDivElement | null;
         if (!lastMsg) {
@@ -116,6 +148,7 @@ export class PiChatView extends ItemView {
             }
             case 'extension_error':
             case 'error': {
+                this.hideLoading();
                 new Notice('Pi 返回了错误');
                 break;
             }
