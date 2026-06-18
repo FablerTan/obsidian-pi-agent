@@ -116,8 +116,6 @@ export class PiChatView extends ItemView {
         this.commandMenu = new CommandMenu(menuContainer, textarea, (cmd) => {
             if (cmd.name === 'new') {
                 this.handleNewSession();
-            } else if (cmd.name === 'reload') {
-                this.handleReload();
             } else if (cmd.name === 'history') {
                 this.handleHistory();
             } else {
@@ -345,7 +343,6 @@ export class PiChatView extends ItemView {
             if (resp?.success && resp.data?.commands) {
                 const builtins = [
                     { name: 'new', description: '新建会话', source: 'extension' as const },
-                    { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
                     { name: 'history', description: '历史会话', source: 'extension' as const },
                 ];
                 this.commandMenu.setCommands([...builtins, ...resp.data.commands]);
@@ -398,19 +395,7 @@ export class PiChatView extends ItemView {
         this.historyPanel.open();
     }
 
-    // ── 处理 /reload ──────────────────────────
-    private async handleReload(): Promise<void> {
-        this.clearLoadingTimeout();
-        this.hideLoading();
-        this.commandMenu.hide();
-        this.textarea.value = '';
-        try {
-            this.piClient.prompt('/reload');
-            new Notice('正在重新加载…');
-        } catch {
-            new Notice('重新加载失败');
-        }
-    }
+
 
     // ── 从 content 数组中提取纯文本 ────────────
     private extractTextFromContent(content: any): string {

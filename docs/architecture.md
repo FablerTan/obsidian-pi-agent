@@ -107,7 +107,7 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `getOrCreateAssistantEl()` | 获取或创建当前助手消息气泡容器（DOM 查询 + 缓存） |
 | `loadCommands()` | 从 pi 加载可用命令列表（`get_commands`），传给 CommandMenu |
 | `handleNewSession()` | 发送 `new_session` RPC，清空消息列表 + 输入框 + 加载状态 |
-| `handleReload()` | 发送 `prompt('/reload')`，清空输入框 + 加载状态 |
+
 | `handleHistory()` | 打开历史会话浮层（`/history` 命令触发） |
 | `abort()` | 发送 `abort` RPC，重置 UI 状态，清除超时定时器 |
 | `extractTextFromContent(content)` | 从 content 数组中提取纯文本 |
@@ -162,14 +162,13 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | 命令 | 处理 |
 |------|------|
 | `/new` | 调用 `handleNewSession()`，清空会话 + 输入框 + 加载状态 |
-| `/reload` | 调用 `handleReload()`，发送 prompt 重载扩展 + 清空输入框 |
 | `/history` | 调用 `handleHistory()`，打开历史会话浮层 |
 | 其他 | 填入 `/命令名 ` 到输入框继续编辑 |
 
 **安全机制**：
 1. **IME 兼容**：`keydown` 中检查 `e.isComposing`，IME 组词期间不拦截 Enter 键，避免组词内容回填
 2. **输出中禁发**：AI 正在输出（loadingEl / currentMarkdown / toolCalls 非空）时，Enter 静默忽略，需先 Esc 打断
-3. **超时保护**：发消息后 5 秒无回复，移除加载动画并提示；`/new` `/reload` `abort` 时主动清除定时器
+3. **超时保护**：发消息后 5 秒无回复，移除加载动画并提示；`/new` `abort` 时主动清除定时器
 
 **上下文组装**（发送消息时，将额外信息拼接到 Prompt 前）：
 | 条件 | 拼接内容 |
