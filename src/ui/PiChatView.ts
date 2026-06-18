@@ -67,21 +67,20 @@ export class PiChatView extends ItemView {
             cls: 'pi-chat-welcome',
         });
 
-        // ── 底部工具栏（历史按钮） ────────────
-        const toolbar = container.createDiv({ cls: 'pi-chat-toolbar' });
-        const historyBtn = toolbar.createEl('button', {
-            cls: 'pi-chat-history-btn',
-        });
-        // 用 Obsidian 内置图标代替文字
-        setIcon(historyBtn, 'history');
-        historyBtn.addEventListener('click', () => {
-            this.openHistory();
-        });
-
-        // ── 底部输入框 ────────────────────────
-        const textarea = container.createEl('textarea', {
+        // ── 底部输入框（历史图标浮在右上角） ────
+        const inputWrapper = container.createDiv({ cls: 'pi-chat-input-wrapper' });
+        const textarea = inputWrapper.createEl('textarea', {
             cls: 'pi-chat-input',
             placeholder: '输入消息... (Enter 发送, Shift+Enter 换行)',
+        });
+
+        // 历史图标浮在输入框右上角
+        const historyIcon = inputWrapper.createEl('span', {
+            cls: 'pi-chat-history-btn',
+        });
+        setIcon(historyIcon, 'history');
+        historyIcon.addEventListener('click', () => {
+            this.openHistory();
         });
 
         // Enter 发送消息给 pi，Shift+Enter 换行
