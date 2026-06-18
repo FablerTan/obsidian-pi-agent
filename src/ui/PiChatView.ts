@@ -368,54 +368,64 @@ export class PiChatView extends ItemView {
         const sectionsEl = this.welcomeEl?.querySelector('.pi-welcome-sections') as HTMLElement | null;
         if (!sectionsEl) return;
 
-        // 并行获取状态和命令列表
-        const [stateResp, cmdResp] = await Promise.all([
-            this.piClient.sendAndWait({ type: 'get_state' }).catch(() => null),
+        // 并行获取统计数据、状态和命令列表
+        const [statResp, cmdResp] = await Promise.all([
+            this.piClient.sendAndWait({ type: 'get_session_stats' }).catch(() => null),
             this.piClient.sendAndWait({ type: 'get_commands' }).catch(() => null),
         ]);
 
-        // ── 模型信息 ──
-        if (stateResp?.success && stateResp.data?.model) {
-            const m = stateResp.data.model;
-            const row = this.addSectionRow(sectionsEl, 'bot',
-                `模型: ${m.name || m.id}`,
-                m.provider ? `${m.provider}` : '');
+        // ── 上下文 ──
+        if (statResp?.success && statResp.data) {
+            const d = statResp.data;
+            const ctx = d.contextUsage;
+
+            // 消息数
+            this.addSectionRow(sectionsEl, 'message-square',
+                `消息: ${d.totalMessages || 0} 条`);
+
+            // token 用量
+            if (d.tokens) {
+                const input = this.formatTokens(d.tokens.input || 0);
+                const output = this.formatTokens(d.tokens.output || 0);
+                this.addSectionRow(sectionsEl, 'sigma',
+                    `Token: ${input} in / ${output} out`);
+            }
+
+            // 上下文窗口占用
+            if (ctx?.percent != null) {
+                this.addSectionRow(sectionsEl, 'gauge',
+                    `上下文: ${ctx.percent}% (${this.formatTokens(ctx.tokens || 0)} / ${this.formatTokens(ctx.contextWindow || 0)})`);
+            }
         }
 
-        // ── 工作目录 ──
-        if (stateResp?.success && stateResp.data?.sessionFile) {
-            const dir = stateResp.data.sessionFile.replace(/\/[^/]+$/, '');
-            this.addSectionRow(sectionsEl, 'folder', '工作目录', dir);
-        }
-
-        // ── 命令分类统计 ──
+        // ── 扩展 ──
         if (cmdResp?.success && cmdResp.data?.commands) {
             const cmds = cmdResp.data.commands;
-
             const extensions = cmds.filter((c: any) => c.source === 'extension');
-            const prompts = cmds.filter((c: any) => c.source === 'prompt');
-            const skills = cmds.filter((c: any) => c.source === 'skill');
+            if (extensions.length > 0) {
+                this.addSectionList(sectionsEl, 'puzzle',
+                    `扩展 (${extensions.length})`,
+                    extensions.map((c: any) => c.name));
+            }
 
-            this.addSectionList(sectionsEl, 'puzzle', `扩展 (${extensions.length})`,
-                extensions.map((c: any) => c.name));
-            this.addSectionList(sectionsEl, 'file-text', `提示模板 (${prompts.length})`,
-                prompts.map((c: any) => c.name));
-            this.addSectionList(sectionsEl, 'sparkles', `技能 (${skills.length})`,
-                skills.map((c: any) => c.name));
+            // ── 命令（prompt 模板 + skill） ──
+            const otherCmds = cmds.filter((c: any) => c.source !== 'extension');
+            if (otherCmds.length > 0) {
+                this.addSectionList(sectionsEl, 'terminal',
+                    `命令 (${otherCmds.length})`,
+                    otherCmds.map((c: any) => c.name));
+            }
         }
     }
 
-    // ── 添加一行信息（图标 + 标题 + 副文本） ────
+    // ── 添加一行信息（图标 + 文字） ────────────
     private addSectionRow(
-        parent: Element, icon: string, label: string, value: string,
+        parent: Element, icon: string, text: string,
     ): HTMLElement {
         const row = parent.createDiv({ cls: 'pi-welcome-row' });
         const iconEl = row.createSpan({ cls: 'pi-welcome-row-icon' });
         setIcon(iconEl, icon);
-        row.createSpan({ cls: 'pi-welcome-row-label', text: label });
-        if (value) {
-            row.createSpan({ cls: 'pi-welcome-row-value', text: value });
-        }
+        row.createSpan({ cls: 'pi-welcome-row-text', text: text });
         return row;
     }
 
@@ -438,6 +448,13 @@ export class PiChatView extends ItemView {
         for (const item of items) {
             list.createEl('li', { cls: 'pi-welcome-list-item', text: item });
         }
+    }
+
+    // ── 格式化 token 数（带单位） ─────────────
+    private formatTokens(n: number): string {
+        if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+        if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+        return String(n);
     }
 
     // ── 从 content 数组中提取纯文本 ────────────

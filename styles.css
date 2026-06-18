@@ -205,12 +205,7 @@ If your plugin does not need CSS, delete this file.
     color: var(--text-accent);
 }
 
-.pi-welcome-row-label {
-    color: var(--text-muted);
-    flex-shrink: 0;
-}
-
-.pi-welcome-row-value {
+.pi-welcome-row-text {
     color: var(--text-normal);
     word-break: break-all;
 }
