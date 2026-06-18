@@ -1,4 +1,4 @@
-# Pi Chat 插件架构文档
+# Pi Agent 插件架构文档
 
 ## 目录结构
 
@@ -219,7 +219,7 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 
 ### 5. `src/ui/WelcomePage.ts` — 欢迎页
 
-**职责**：首次对话前显示 Pi Chat 标题、上下文文件列表、可用命令列表（按 source 分组）。
+**职责**：首次对话前显示 Pi Agent 标题、上下文文件列表、可用命令列表（按 source 分组）。
 
 | 方法 | 说明 |
 |------|------|
