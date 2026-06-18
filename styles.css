@@ -150,14 +150,16 @@ If your plugin does not need CSS, delete this file.
     box-sizing: border-box;
 }
 
-/* 欢迎页 — 垂直居中，内容靠左对齐 */
+/* 欢迎页 — 垂直居中，等宽字体风格，类似终端输出 */
 .pi-chat-welcome {
     margin: auto;
-    padding: 20px 24px;
+    padding: 24px 28px;
     width: 100%;
-    max-width: 400px;
+    max-width: 420px;
     color: var(--text-muted);
-    font-size: var(--font-ui-small);
+    font-family: var(--font-monospace);
+    font-size: 12px;
+    line-height: 1.6;
 }
 
 .pi-welcome-title {
@@ -165,15 +167,16 @@ If your plugin does not need CSS, delete this file.
     align-items: center;
     justify-content: center;
     gap: 8px;
-    font-size: var(--font-ui-large);
+    font-size: 16px;
     font-weight: var(--font-semibold);
     color: var(--text-normal);
     margin-bottom: 20px;
+    font-family: var(--font-ui);
 }
 
 .pi-welcome-logo {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -183,59 +186,21 @@ If your plugin does not need CSS, delete this file.
 .pi-welcome-sections {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-}
-
-/* 单行信息 */
-.pi-welcome-row {
-    display: flex;
-    align-items: flex-start;
     gap: 6px;
-    line-height: 1.5;
 }
 
-.pi-welcome-row-icon {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-    margin-top: 2px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-accent);
-}
+.pi-welcome-block {}
 
-.pi-welcome-row-text {
+.pi-welcome-block-title {
     color: var(--text-normal);
-    word-break: break-all;
-}
-
-/* 列表区块 */
-.pi-welcome-section {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.pi-welcome-section-title {
-    display: flex;
-    align-items: center;
-    gap: 6px;
     font-weight: var(--font-semibold);
-    color: var(--text-normal);
+    margin-top: 4px;
 }
 
-.pi-welcome-list {
-    list-style: none;
-    margin: 0;
-    padding: 0 0 0 20px;
-}
-
-.pi-welcome-list-item {
-    font-family: var(--font-monospace);
-    font-size: 11px;
-    padding: 1px 0;
+.pi-welcome-block-line {
+    padding-left: 0;
     color: var(--text-muted);
+    white-space: pre;
 }
 
 /* ── 顶部横条 ──────────────────────── */

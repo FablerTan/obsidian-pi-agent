@@ -1,13 +1,15 @@
 // 导入 Obsidian 的 ItemView 基类
 // ItemView: 可以在 Obsidian 工作区中创建自定义面板
 // WorkspaceLeaf: 每个视图都挂在一个"叶子"上
-import { ItemView, WorkspaceLeaf, Notice, setIcon } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, setIcon, FileSystemAdapter } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 import { HistoryPanel } from './HistoryPanel';
 import { MarkdownMsg } from './MarkdownMsg';
 import { ToolCallMsg } from './ToolCallMsg';
 import { CommandMenu } from './CommandMenu';
 import { InputStatusBar } from './InputStatusBar';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // 视图的唯一标识符，用来注册和查找这个视图
 export const PI_CHAT_VIEW_TYPE = 'pi-chat-view';
@@ -357,7 +359,7 @@ export class PiChatView extends ItemView {
         setIcon(logo, 'pi-logo');
         title.createSpan({ text: 'Pi Chat' });
 
-        // 内容列表容器
+        // 内容容器
         el.createDiv({ cls: 'pi-welcome-sections' });
 
         return el;
@@ -368,93 +370,68 @@ export class PiChatView extends ItemView {
         const sectionsEl = this.welcomeEl?.querySelector('.pi-welcome-sections') as HTMLElement | null;
         if (!sectionsEl) return;
 
-        // 并行获取统计数据、状态和命令列表
-        const [statResp, cmdResp] = await Promise.all([
-            this.piClient.sendAndWait({ type: 'get_session_stats' }).catch(() => null),
+        // 并行获取上下文文件和命令列表
+        const [contextFiles, cmdResp] = await Promise.all([
+            this.readContextFiles(),
             this.piClient.sendAndWait({ type: 'get_commands' }).catch(() => null),
         ]);
 
-        // ── 上下文 ──
-        if (statResp?.success && statResp.data) {
-            const d = statResp.data;
-            const ctx = d.contextUsage;
-
-            // 消息数
-            this.addSectionRow(sectionsEl, 'message-square',
-                `消息: ${d.totalMessages || 0} 条`);
-
-            // token 用量
-            if (d.tokens) {
-                const input = this.formatTokens(d.tokens.input || 0);
-                const output = this.formatTokens(d.tokens.output || 0);
-                this.addSectionRow(sectionsEl, 'sigma',
-                    `Token: ${input} in / ${output} out`);
-            }
-
-            // 上下文窗口占用
-            if (ctx?.percent != null) {
-                this.addSectionRow(sectionsEl, 'gauge',
-                    `上下文: ${ctx.percent}% (${this.formatTokens(ctx.tokens || 0)} / ${this.formatTokens(ctx.contextWindow || 0)})`);
-            }
+        // ── [Context] ──
+        if (contextFiles.length > 0) {
+            this.addBlock(sectionsEl, '[Context]', contextFiles.map(f => `  ${f}`));
         }
 
-        // ── 扩展 ──
         if (cmdResp?.success && cmdResp.data?.commands) {
             const cmds = cmdResp.data.commands;
+
+            // ── [Skills] ──
+            const skills = cmds.filter((c: any) => c.source === 'skill');
+            if (skills.length > 0) {
+                this.addBlock(sectionsEl, '[Skills]',
+                    skills.map((c: any) => `  ${c.name.replace(/^skill:/, '')}`));
+            }
+
+            // ── [Prompts] ──
+            const prompts = cmds.filter((c: any) => c.source === 'prompt');
+            if (prompts.length > 0) {
+                this.addBlock(sectionsEl, '[Prompts]',
+                    prompts.map((c: any) => `  /${c.name}`));
+            }
+
+            // ── [Extensions] ──
             const extensions = cmds.filter((c: any) => c.source === 'extension');
             if (extensions.length > 0) {
-                this.addSectionList(sectionsEl, 'puzzle',
-                    `扩展 (${extensions.length})`,
-                    extensions.map((c: any) => c.name));
-            }
-
-            // ── 命令（prompt 模板 + skill） ──
-            const otherCmds = cmds.filter((c: any) => c.source !== 'extension');
-            if (otherCmds.length > 0) {
-                this.addSectionList(sectionsEl, 'terminal',
-                    `命令 (${otherCmds.length})`,
-                    otherCmds.map((c: any) => c.name));
+                this.addBlock(sectionsEl, '[Extensions]',
+                    extensions.map((c: any) => `  ${c.name}`));
             }
         }
     }
 
-    // ── 添加一行信息（图标 + 文字） ────────────
-    private addSectionRow(
-        parent: Element, icon: string, text: string,
-    ): HTMLElement {
-        const row = parent.createDiv({ cls: 'pi-welcome-row' });
-        const iconEl = row.createSpan({ cls: 'pi-welcome-row-icon' });
-        setIcon(iconEl, icon);
-        row.createSpan({ cls: 'pi-welcome-row-text', text: text });
-        return row;
+    // ── 读取上下文文件 ──────────────────────────
+    private async readContextFiles(): Promise<string[]> {
+        try {
+            const vaultPath = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
+            const agentDir = path.join(vaultPath, '.pi', 'agent');
+            const files = fs.readdirSync(agentDir);
+            return files
+                .filter(f => f.endsWith('.md') || f.endsWith('.txt') || f.endsWith('.md'))
+                .sort();
+        } catch {
+            return [];
+        }
     }
 
-    // ── 添加一个带标题的列表区块 ────────────────
-    private addSectionList(
-        parent: Element, icon: string, title: string, items: string[],
+    // ── 添加一个区块（标题 + 行列表） ────────────
+    private addBlock(
+        parent: Element, title: string, lines: string[],
     ): void {
-        if (items.length === 0) return;
+        if (lines.length === 0) return;
 
-        const section = parent.createDiv({ cls: 'pi-welcome-section' });
-
-        // 标题行
-        const titleRow = section.createDiv({ cls: 'pi-welcome-section-title' });
-        const iconEl = titleRow.createSpan({ cls: 'pi-welcome-row-icon' });
-        setIcon(iconEl, icon);
-        titleRow.createSpan({ cls: 'pi-welcome-row-label', text: title });
-
-        // 列表
-        const list = section.createEl('ul', { cls: 'pi-welcome-list' });
-        for (const item of items) {
-            list.createEl('li', { cls: 'pi-welcome-list-item', text: item });
+        const block = parent.createDiv({ cls: 'pi-welcome-block' });
+        block.createDiv({ cls: 'pi-welcome-block-title', text: title });
+        for (const line of lines) {
+            block.createDiv({ cls: 'pi-welcome-block-line', text: line });
         }
-    }
-
-    // ── 格式化 token 数（带单位） ─────────────
-    private formatTokens(n: number): string {
-        if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-        if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
-        return String(n);
     }
 
     // ── 从 content 数组中提取纯文本 ────────────
