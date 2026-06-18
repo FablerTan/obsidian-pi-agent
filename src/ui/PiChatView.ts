@@ -446,9 +446,11 @@ export class PiChatView extends ItemView {
                 this.addSystemMessage('refresh-cw', 'Pi 已重载', (el) => {
                     const order = ['extension', 'skill', 'prompt'];
                     const labels: Record<string, string> = { extension: '扩展', skill: '技能', prompt: '模板' };
+                    let hasContent = false;
                     for (const key of order) {
                         const items = groups.get(key);
                         if (items && items.length > 0) {
+                            hasContent = true;
                             const section = el.createDiv({ cls: 'pi-reload-section' });
                             section.createSpan({ cls: 'pi-reload-label', text: labels[key] || key });
                             section.createSpan({ cls: 'pi-reload-count', text: String(items.length) });
@@ -459,9 +461,14 @@ export class PiChatView extends ItemView {
                         }
                         groups.delete(key);
                     }
+                    if (!hasContent) {
+                        el.createSpan({ cls: 'pi-reload-none', text: '没有更新' });
+                    }
                 });
             } else {
-                this.addSystemMessage('refresh-cw', 'Pi 已重载', () => {});
+                this.addSystemMessage('refresh-cw', 'Pi 已重载', (el) => {
+                    el.createSpan({ cls: 'pi-reload-none', text: '没有更新' });
+                });
                 this.loadCommands();
             }
         } catch {

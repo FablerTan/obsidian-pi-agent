@@ -448,6 +448,12 @@ If your plugin does not need CSS, delete this file.
     color: var(--text-muted);
 }
 
+.pi-reload-none {
+    color: var(--text-faint);
+    font-style: italic;
+    font-size: 11px;
+}
+
 /* markdown 渲染内容的通用样式 */
 .pi-chat-msg-assistant p {
     margin: 0 0 6px 0;
