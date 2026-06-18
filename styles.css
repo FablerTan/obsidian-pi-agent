@@ -374,9 +374,10 @@ If your plugin does not need CSS, delete this file.
 
 /* ── 系统通知消息（/reload 等） ───────────── */
 .pi-chat-msg-system {
-    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
     border-radius: 8px;
-    padding: 8px 12px;
+    background: var(--background-primary);
+    padding: 10px 12px;
     margin-bottom: 8px;
     font-size: var(--font-ui-small);
     user-select: text;
