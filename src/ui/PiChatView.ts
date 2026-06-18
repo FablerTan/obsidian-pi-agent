@@ -434,19 +434,15 @@ export class PiChatView extends ItemView {
         this.commandMenu.hide();
         this.textarea.value = '';
         try {
-            // 确保有对比基准：如果 previousCmdNames 仍为空（onOpen 时加载失败等），先获取一次
-            if (this.previousCmdNames.size === 0) {
-                try {
-                    const initResp = await this.piClient.sendAndWait({ type: 'get_commands' });
-                    if (initResp?.success && initResp.data?.commands) {
-                        const initCmds: any[] = initResp.data.commands;
-                        this.previousCmdNames = new Set(initCmds.map((c: any) => c.name));
-                        this.previousCmdList = initCmds.map((c: any) => ({ name: c.name, source: c.source || 'other' }));
-                    }
-                } catch { /* 忽略，继续 reload */ }
-            }
+            // ── 在进入 async 流程前就锁定对比基准（局部常量，不受后续副作用影响） ──
+            const oldNames = this.previousCmdNames.size > 0
+                ? new Set(this.previousCmdNames)
+                : await this.fetchCurrentCmdNames();
+            const oldCmdList = this.previousCmdList;
+
             new Notice('正在重载 Pi…');
             await this.piClient.restart();
+
             // 获取重载后的命令列表
             const resp = await this.piClient.sendAndWait({ type: 'get_commands' });
             if (resp?.success && resp.data?.commands) {
@@ -457,48 +453,39 @@ export class PiChatView extends ItemView {
                     { name: 'history', description: '历史会话', source: 'extension' as const },
                     ...cmds,
                 ]);
-                // 按 source 分组（每个命令保留 name + source）
+                // 按 source 分组
                 const groups = new Map<string, { name: string; source: string }[]>();
                 for (const c of cmds) {
                     const src = c.source || 'other';
                     if (!groups.has(src)) groups.set(src, []);
                     groups.get(src)!.push({ name: c.name, source: src });
                 }
-                // 新命令名集合（不含 builtins）
                 const newNames = new Set(cmds.map((c: any) => c.name));
-                // 找出被移除的命令（在 previousCmdNames 中但不在新集合中）
+                // 用局部常量 oldNames 做对比，不受 this.previousCmdNames 后续变动影响
                 const removedNames = new Set<string>();
-                for (const old of this.previousCmdNames) {
-                    if (!newNames.has(old) && old !== 'new' && old !== 'reload' && old !== 'history') {
+                for (const old of oldNames) {
+                    if (!newNames.has(old)) {
                         removedNames.add(old);
                     }
                 }
                 // source 标签映射
                 const labels: Record<string, string> = {
-                    extension: '扩展',
-                    skill: '技能',
-                    prompt: '模板',
-                    model: '模型',
-                    tool: '工具',
-                    other: '其他',
+                    extension: '扩展', skill: '技能', prompt: '模板',
+                    model: '模型', tool: '工具', other: '其他',
                 };
-                // 显示顺序
                 const order = ['extension', 'skill', 'prompt', 'tool', 'model'];
-                // 构建通知消息
+                // 构建通知消息（oldNames 传给回调，闭包捕获的是局部常量）
                 this.addSystemMessage('refresh-cw', 'Pi 已重载', (el) => {
-                    // 先按顺序显示已知类型
                     for (const key of order) {
                         const items = groups.get(key);
                         if (!items || items.length === 0) continue;
-                        this.renderReloadGroup(el, labels[key] || key, items, newNames, removedNames);
+                        this.renderReloadGroup(el, labels[key] || key, items, oldNames, removedNames);
                         groups.delete(key);
                     }
-                    // 显示剩余未识别的 source 类型
                     for (const [key, items] of groups.entries()) {
                         if (items.length === 0) continue;
-                        this.renderReloadGroup(el, labels[key] || key, items, newNames, removedNames);
+                        this.renderReloadGroup(el, labels[key] || key, items, oldNames, removedNames);
                     }
-                    // 如果有被移除的命令但上面未显示（理论上已移除的不属于任何现有组）
                     if (removedNames.size > 0) {
                         const section = el.createDiv({ cls: 'pi-reload-section pi-reload-section-removed' });
                         section.createSpan({ cls: 'pi-reload-label', text: '已移除' });
@@ -509,20 +496,18 @@ export class PiChatView extends ItemView {
                             itemEl.setText(n);
                         }
                     }
-                    // 如果没有任何变化，加一行小字提示
-                    if (removedNames.size === 0 && ![...newNames].some(n => !this.previousCmdNames.has(n))) {
+                    if (removedNames.size === 0 && ![...newNames].some(n => !oldNames.has(n))) {
                         const note = el.createDiv({ cls: 'pi-reload-note' });
                         note.setText('无变化');
                     }
                 });
-                // 保存新命令名和完整数据供下次对比
+                // 保存新数据供下次对比
                 this.previousCmdNames = new Set(cmds.map((c: any) => c.name));
                 this.previousCmdList = cmds.map((c: any) => ({ name: c.name, source: c.source || 'other' }));
             } else {
-                // get_commands 失败时，用缓存数据（如果有）显示具体内容
-                if (this.previousCmdList.length > 0) {
+                if (oldCmdList.length > 0) {
                     this.addSystemMessage('refresh-cw', 'Pi 已重载（命令列表未更新）', (el) => {
-                        this.renderReloadFromCache(el, this.previousCmdList);
+                        this.renderReloadFromCache(el, oldCmdList, oldNames);
                     });
                 } else {
                     this.addSystemMessage('refresh-cw', 'Pi 已重载', (el) => {
@@ -538,9 +523,24 @@ export class PiChatView extends ItemView {
         }
     }
 
+    // ── 从当前 pi 进程获取命令列表作为对比基准 ──
+    private async fetchCurrentCmdNames(): Promise<Set<string>> {
+        try {
+            const resp = await this.piClient.sendAndWait({ type: 'get_commands' });
+            if (resp?.success && resp.data?.commands) {
+                const cmds: any[] = resp.data.commands;
+                return new Set(cmds.map((c: any) => c.name));
+            }
+        } catch { }
+        return new Set<string>();
+    }
+
     // ── 用缓存数据渲染 reload 消息（get_commands 失败时回退） ──
-    private renderReloadFromCache(el: HTMLElement, cmds: { name: string; source: string }[]): void {
-        // 按 source 分组
+    private renderReloadFromCache(
+        el: HTMLElement,
+        cmds: { name: string; source: string }[],
+        oldNames: Set<string>,
+    ): void {
         const groups = new Map<string, { name: string; source: string }[]>();
         for (const c of cmds) {
             if (!groups.has(c.source)) groups.set(c.source, []);
@@ -551,17 +551,17 @@ export class PiChatView extends ItemView {
             model: '模型', tool: '工具', other: '其他',
         };
         const order = ['extension', 'skill', 'prompt', 'tool', 'model'];
+        const emptyRemoved = new Set<string>();
         for (const key of order) {
             const items = groups.get(key);
             if (!items || items.length === 0) continue;
-            this.renderReloadGroup(el, labels[key] || key, items, new Set(), new Set());
+            this.renderReloadGroup(el, labels[key] || key, items, oldNames, emptyRemoved);
             groups.delete(key);
         }
         for (const [key, items] of groups.entries()) {
             if (items.length === 0) continue;
-            this.renderReloadGroup(el, labels[key] || key, items, new Set(), new Set());
+            this.renderReloadGroup(el, labels[key] || key, items, oldNames, emptyRemoved);
         }
-        // 脚注：提示这是缓存数据
         const note = el.createDiv({ cls: 'pi-reload-note' });
         note.setText('↑ 命令列表未刷新，显示上次加载的内容');
     }
@@ -571,7 +571,7 @@ export class PiChatView extends ItemView {
         el: HTMLElement,
         label: string,
         items: { name: string; source: string }[],
-        newNames: Set<string>,
+        oldNames: Set<string>,
         removedNames: Set<string>,
     ): void {
         const section = el.createDiv({ cls: 'pi-reload-section' });
@@ -579,13 +579,12 @@ export class PiChatView extends ItemView {
         section.createSpan({ cls: 'pi-reload-count', text: String(items.length) });
         const itemsWrap = el.createDiv({ cls: 'pi-reload-items' });
         for (const item of items) {
-            const isNew = !this.previousCmdNames.has(item.name);
+            const isNew = !oldNames.has(item.name);
             const isRemoved = removedNames.has(item.name);
             const itemEl = itemsWrap.createSpan({ cls: 'pi-reload-item' });
             itemEl.setText(item.name);
             if (isNew) {
                 itemEl.addClass('pi-reload-item-new');
-                // 从移除集合中剔除（不可能同时新增又移除，但防御性处理）
                 removedNames.delete(item.name);
             }
             if (isRemoved) {

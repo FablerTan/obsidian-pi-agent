@@ -109,9 +109,10 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `loadCommands()` | 从 pi 加载可用命令列表（`get_commands`），传给 CommandMenu，同时保存不含 builtins 的命令名和数据到 `previousCmdNames` / `previousCmdList` |
 | `handleNewSession()` | 发送 `new_session` RPC，清空消息列表 + 输入框 + 加载状态 |
 
-| `handleReload()` | 重启 pi 子进程，对比命令列表变化，显示分组详情（新增绿色、移除红色+删除线）；如果 `previousCmdNames` 为空（初始加载未完成），先获取当前命令列表作为对比基准 |
-| `renderReloadGroup(el, label, items, newNames, removedNames)` | 渲染 reload 消息中的一个分组（扩展/技能/模板等），逐项标记新增或移除 |
-| `renderReloadFromCache(el, cmds)` | `get_commands` 失败时用缓存数据回退渲染具体列表 |
+| `handleReload()` | 重启 pi 子进程，对比命令列表变化，显示分组详情（新增绿色、移除红色+删除线）；一开始就将 `previousCmdNames` 捕获到局部常量 `oldNames`，后续对比基于此，不受副作用影响 |
+| `fetchCurrentCmdNames()` | 从当前 pi 进程获取命令名集合，`previousCmdNames` 为空时作为对比基准 |
+| `renderReloadGroup(el, label, items, oldNames, removedNames)` | 渲染 reload 消息中的一个分组（扩展/技能/模板等），使用传入的 `oldNames` 判断新增，逐项标记 |
+| `renderReloadFromCache(el, cmds, oldNames)` | `get_commands` 失败时用缓存数据回退渲染具体列表，同样使用传入的 `oldNames` |
 | `handleHistory()` | 打开历史会话浮层（`/history` 命令触发） |
 | `abort()` | 发送 `abort` RPC，重置 UI 状态，清除超时定时器 |
 | `extractTextFromContent(content)` | 从 content 数组中提取纯文本 |
@@ -132,8 +133,8 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `currentNoteName` | `string \| null` | 当前活动笔记的文件名 |
 | `noteAttached` | `boolean` | 是否将笔记路径附加到消息中 |
 | `selectedText` | `string` | 当前编辑器中选中的文本（失焦时保留） |
-| `previousCmdNames` | `Set<string>` | 上一次加载的命令名集合，用于 `/reload` 对比新增/移除 |
-| `previousCmdList` | `{ name, source }[]` | 上一次加载的完整命令数据，`get_commands` 失败时回退显示 |
+| `previousCmdNames` | `Set<string>` | 上一次加载的命令名集合（不含 builtins），`handleReload()` 一开始就捕获到局部常量 |
+| `previousCmdList` | `{ name, source }[]` | 上一次加载的完整命令数据（不含 builtins），`get_commands` 失败时回退显示 |
 
 **UI 结构**：
 ```
