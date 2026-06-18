@@ -13,6 +13,7 @@ If your plugin does not need CSS, delete this file.
     display: flex;
     flex-direction: column;
     height: 100%;
+    position: relative; /* 给历史浮层做定位基准 */
 }
 
 /* 内容区域（消息列表 + 输入框）占满剩余空间 */
@@ -52,7 +53,47 @@ If your plugin does not need CSS, delete this file.
     color: var(--text-muted);
 }
 
-/* ── 历史会话弹窗 ──────────────────── */
+/* ── 历史会话浮层（面板内） ────────── */
+.pi-history-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--background-primary);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.pi-history-titlebar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    font-weight: var(--font-semibold);
+    font-size: var(--font-ui-medium);
+}
+
+.pi-history-close {
+    width: 18px;
+    height: 18px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.pi-history-close:hover {
+    color: var(--text-normal);
+}
+
+.pi-history-empty {
+    text-align: center;
+    color: var(--text-muted);
+    margin-top: 40px;
+}
+
 .pi-history-list {
     list-style: none;
     padding: 0;
