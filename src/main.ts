@@ -12,17 +12,28 @@ import {
 	SampleSettingTab,
 } from './settings';
 import { PiChatView, PI_CHAT_VIEW_TYPE } from './ui/PiChatView';
+import { PiRpcClient } from './pi/rpc-client';
 
 // Remember to rename these classes and interfaces!
 
 export default class MyPlugin extends Plugin {
 	settings!: MyPluginSettings;
 
+	// pi RPC 客户端
+	piClient!: PiRpcClient;
+
 	async onload() {
 		await this.loadSettings();
 
-		// 注册聊天面板视图
-		this.registerView(PI_CHAT_VIEW_TYPE, (leaf) => new PiChatView(leaf));
+		// 启动 pi RPC 客户端（后台连接 pi 进程）
+		this.piClient = new PiRpcClient();
+		this.piClient.start((this.app.vault.adapter as any).basePath);
+
+		// 注册聊天面板视图，把 piClient 传进去
+		this.registerView(
+			PI_CHAT_VIEW_TYPE,
+			(leaf) => new PiChatView(leaf, this.piClient),
+		);
 
 		// 在左侧栏添加图标，点击打开聊天面板
 		this.addRibbonIcon('message-square', 'Open Pi Chat', () => {
@@ -92,6 +103,9 @@ export default class MyPlugin extends Plugin {
 	onunload() {
 		// 关闭所有打开的聊天面板
 		this.app.workspace.detachLeavesOfType(PI_CHAT_VIEW_TYPE);
+
+		// 停止 pi 子进程
+		this.piClient?.stop();
 	}
 
 	// 打开聊天面板（如果已打开就切换到它）

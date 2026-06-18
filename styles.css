@@ -41,3 +41,26 @@ If your plugin does not need CSS, delete this file.
     color: var(--text-muted);
     margin-top: 40px;
 }
+
+/* ── 消息样式 ──────────────────────── */
+.pi-chat-msg-user {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    max-width: 85%;
+    margin-left: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.pi-chat-msg-assistant {
+    background: var(--background-secondary);
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    max-width: 85%;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
