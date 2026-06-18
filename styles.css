@@ -150,11 +150,97 @@ If your plugin does not need CSS, delete this file.
     box-sizing: border-box;
 }
 
-/* 欢迎文字 — 居中显示 */
+/* 欢迎页 — 垂直居中，内容靠左对齐 */
 .pi-chat-welcome {
-    text-align: center;
+    margin: auto;
+    padding: 20px 24px;
+    width: 100%;
+    max-width: 400px;
     color: var(--text-muted);
-    margin: auto;  /* 在 flex 容器里水平和垂直都居中 */
+    font-size: var(--font-ui-small);
+}
+
+.pi-welcome-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: var(--font-ui-large);
+    font-weight: var(--font-semibold);
+    color: var(--text-normal);
+    margin-bottom: 20px;
+}
+
+.pi-welcome-logo {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-accent);
+}
+
+.pi-welcome-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* 单行信息 */
+.pi-welcome-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    line-height: 1.5;
+}
+
+.pi-welcome-row-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-accent);
+}
+
+.pi-welcome-row-label {
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.pi-welcome-row-value {
+    color: var(--text-normal);
+    word-break: break-all;
+}
+
+/* 列表区块 */
+.pi-welcome-section {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pi-welcome-section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: var(--font-semibold);
+    color: var(--text-normal);
+}
+
+.pi-welcome-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 20px;
+}
+
+.pi-welcome-list-item {
+    font-family: var(--font-monospace);
+    font-size: 11px;
+    padding: 1px 0;
+    color: var(--text-muted);
 }
 
 /* ── 顶部横条 ──────────────────────── */

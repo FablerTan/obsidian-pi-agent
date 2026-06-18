@@ -16,8 +16,8 @@ export class PiChatView extends ItemView {
     // 消息列表容器
     messagesEl!: HTMLDivElement;
 
-    // 欢迎文字元素（首次对话前显示，发消息后移除）
-    private welcomeEl!: HTMLParagraphElement;
+    // 欢迎页元素（首次对话前显示，发消息后移除）
+    private welcomeEl!: HTMLElement;
 
     // 加载动画元素（发送消息后、收到回复前显示）
     private loadingEl: HTMLDivElement | null = null;
@@ -78,10 +78,8 @@ export class PiChatView extends ItemView {
 
         // 消息列表
         const messagesEl = container.createDiv({ cls: 'pi-chat-messages' });
-        this.welcomeEl = messagesEl.createEl('p', {
-            text: '开始和 Pi 对话吧！',
-            cls: 'pi-chat-welcome',
-        });
+        this.welcomeEl = this.createWelcomeEl(messagesEl);
+        this.loadWelcomeData();
 
         // 历史会话按钮（输入框上方靠右）
         this.historyPanel = new HistoryPanel(this.piClient, messagesEl, contentEl, this.app);
@@ -325,11 +323,9 @@ export class PiChatView extends ItemView {
                 this.currentMarkdown = null;
                 this.currentAssistantEl = null;
                 this.toolCalls.clear();
-                // 重新显示欢迎文字
-                this.welcomeEl = this.messagesEl.createEl('p', {
-                    text: '开始和 Pi 对话吧！',
-                    cls: 'pi-chat-welcome',
-                });
+                // 重新显示欢迎页并加载数据
+                this.welcomeEl = this.createWelcomeEl(this.messagesEl);
+                this.loadWelcomeData();
                 new Notice('已创建新会话');
             } else {
                 new Notice('新建会话失败');
@@ -348,6 +344,99 @@ export class PiChatView extends ItemView {
             new Notice('正在重新加载…');
         } catch {
             new Notice('重新加载失败');
+        }
+    }
+
+    // ── 创建欢迎页 ────────────────────────────
+    private createWelcomeEl(parent: HTMLElement): HTMLElement {
+        const el = parent.createDiv({ cls: 'pi-chat-welcome' });
+
+        // 标题
+        const title = el.createDiv({ cls: 'pi-welcome-title' });
+        const logo = title.createSpan({ cls: 'pi-welcome-logo' });
+        setIcon(logo, 'pi-logo');
+        title.createSpan({ text: 'Pi Chat' });
+
+        // 内容列表容器
+        el.createDiv({ cls: 'pi-welcome-sections' });
+
+        return el;
+    }
+
+    // ── 加载欢迎页数据 ──────────────────────────
+    private async loadWelcomeData(): Promise<void> {
+        const sectionsEl = this.welcomeEl?.querySelector('.pi-welcome-sections') as HTMLElement | null;
+        if (!sectionsEl) return;
+
+        // 并行获取状态和命令列表
+        const [stateResp, cmdResp] = await Promise.all([
+            this.piClient.sendAndWait({ type: 'get_state' }).catch(() => null),
+            this.piClient.sendAndWait({ type: 'get_commands' }).catch(() => null),
+        ]);
+
+        // ── 模型信息 ──
+        if (stateResp?.success && stateResp.data?.model) {
+            const m = stateResp.data.model;
+            const row = this.addSectionRow(sectionsEl, 'bot',
+                `模型: ${m.name || m.id}`,
+                m.provider ? `${m.provider}` : '');
+        }
+
+        // ── 工作目录 ──
+        if (stateResp?.success && stateResp.data?.sessionFile) {
+            const dir = stateResp.data.sessionFile.replace(/\/[^/]+$/, '');
+            this.addSectionRow(sectionsEl, 'folder', '工作目录', dir);
+        }
+
+        // ── 命令分类统计 ──
+        if (cmdResp?.success && cmdResp.data?.commands) {
+            const cmds = cmdResp.data.commands;
+
+            const extensions = cmds.filter((c: any) => c.source === 'extension');
+            const prompts = cmds.filter((c: any) => c.source === 'prompt');
+            const skills = cmds.filter((c: any) => c.source === 'skill');
+
+            this.addSectionList(sectionsEl, 'puzzle', `扩展 (${extensions.length})`,
+                extensions.map((c: any) => c.name));
+            this.addSectionList(sectionsEl, 'file-text', `提示模板 (${prompts.length})`,
+                prompts.map((c: any) => c.name));
+            this.addSectionList(sectionsEl, 'sparkles', `技能 (${skills.length})`,
+                skills.map((c: any) => c.name));
+        }
+    }
+
+    // ── 添加一行信息（图标 + 标题 + 副文本） ────
+    private addSectionRow(
+        parent: Element, icon: string, label: string, value: string,
+    ): HTMLElement {
+        const row = parent.createDiv({ cls: 'pi-welcome-row' });
+        const iconEl = row.createSpan({ cls: 'pi-welcome-row-icon' });
+        setIcon(iconEl, icon);
+        row.createSpan({ cls: 'pi-welcome-row-label', text: label });
+        if (value) {
+            row.createSpan({ cls: 'pi-welcome-row-value', text: value });
+        }
+        return row;
+    }
+
+    // ── 添加一个带标题的列表区块 ────────────────
+    private addSectionList(
+        parent: Element, icon: string, title: string, items: string[],
+    ): void {
+        if (items.length === 0) return;
+
+        const section = parent.createDiv({ cls: 'pi-welcome-section' });
+
+        // 标题行
+        const titleRow = section.createDiv({ cls: 'pi-welcome-section-title' });
+        const iconEl = titleRow.createSpan({ cls: 'pi-welcome-row-icon' });
+        setIcon(iconEl, icon);
+        titleRow.createSpan({ cls: 'pi-welcome-row-label', text: title });
+
+        // 列表
+        const list = section.createEl('ul', { cls: 'pi-welcome-list' });
+        for (const item of items) {
+            list.createEl('li', { cls: 'pi-welcome-list-item', text: item });
         }
     }
 
