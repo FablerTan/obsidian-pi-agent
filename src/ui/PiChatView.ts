@@ -1,7 +1,7 @@
 // 导入 Obsidian 的 ItemView 基类
 // ItemView: 可以在 Obsidian 工作区中创建自定义面板
 // WorkspaceLeaf: 每个视图都挂在一个"叶子"上
-import { ItemView, WorkspaceLeaf, Notice, setIcon, FileSystemAdapter, MarkdownView } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, setIcon, FileSystemAdapter } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 import { HistoryPanel } from './HistoryPanel';
 import { MarkdownMsg } from './MarkdownMsg';
@@ -201,7 +201,7 @@ ${msg}`;
 
         // ── 监听当前活动笔记变化 ──
         this.registerEvent(
-            this.app.workspace.on('active-leaf-change', () => {
+            this.app.workspace.on('file-open', (_file: any) => {
                 this.updateCurrentNote();
             }),
         );
@@ -429,16 +429,16 @@ ${msg}`;
     // ── 更新笔记栏图标状态 ────────────────────
     private updateNoteIcon(): void {
         this.noteBarEl.toggleClass('pi-chat-note-attached', this.noteAttached);
-        setIcon(this.noteToggleIcon, this.noteAttached ? 'pin' : 'file-text');
+        setIcon(this.noteToggleIcon, this.noteAttached ? 'pin' : 'pin-off');
     }
 
     // ── 从活动编辑器更新当前笔记 ──────────────
     private updateCurrentNote(): void {
-        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (view?.file) {
-            this.currentNotePath = view.file.path;
-            this.currentNoteName = view.file.name;
-            this.noteNameEl.setText(this.currentNoteName);
+        const file = this.app.workspace.getActiveFile();
+        if (file) {
+            this.currentNotePath = file.path;
+            this.currentNoteName = file.name;
+            this.noteNameEl.setText(file.name);
             this.noteBarEl.toggleClass('pi-chat-note-empty', false);
         } else {
             this.currentNotePath = null;
