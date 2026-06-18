@@ -6,3 +6,38 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+/* ── Pi Chat 面板布局 ──────────────────── */
+.pi-chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* 消息列表区域，可滚动 */
+.pi-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+/* 输入框，贴在底部 */
+.pi-chat-input {
+    width: 100%;
+    resize: none;
+    min-height: 60px;
+    max-height: 150px;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    font-size: var(--font-ui-small);
+    box-sizing: border-box;
+}
+
+/* 欢迎文字 */
+.pi-chat-welcome {
+    text-align: center;
+    color: var(--text-muted);
+    margin-top: 40px;
+}

@@ -7,6 +7,9 @@ import { ItemView, WorkspaceLeaf } from 'obsidian';
 export const PI_CHAT_VIEW_TYPE = 'pi-chat-view';
 
 export class PiChatView extends ItemView {
+    // 消息列表容器，后续添加消息时要用
+    messagesEl!: HTMLDivElement;
+
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
     }
@@ -25,7 +28,37 @@ export class PiChatView extends ItemView {
     async onOpen(): Promise<void> {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.setText('Pi Chat 面板已加载');
+
+        // ── 整个面板用一个容器包裹 ────────────
+        const container = contentEl.createDiv({ cls: 'pi-chat-container' });
+
+        // ── 消息列表区域（可滚动） ────────────
+        const messagesEl = container.createDiv({ cls: 'pi-chat-messages' });
+        messagesEl.createEl('p', {
+            text: '开始和 Pi 对话吧！',
+            cls: 'pi-chat-welcome',
+        });
+
+        // ── 底部输入框 ────────────────────────
+        // 只保留 textarea，去掉发送按钮
+        const textarea = container.createEl('textarea', {
+            cls: 'pi-chat-input',
+            placeholder: '输入消息... (Enter 发送, Shift+Enter 换行)',
+        });
+
+        // Enter 发送消息，Shift+Enter 换行
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const msg = textarea.value.trim();
+                if (!msg) return;
+                console.log('send:', msg);
+                textarea.value = '';
+            }
+        });
+
+        // 把元素存到字段上，方便其他地方引用
+        this.messagesEl = messagesEl;
     }
 
     // 面板被关闭时调用，清理资源
