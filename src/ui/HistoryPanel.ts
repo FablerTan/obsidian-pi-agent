@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { PiRpcClient } from '../pi/rpc-client';
 import { extractTextContent } from '../utils/helpers';
+import { ToolCallMsg } from './ToolCallMsg';
 
 export class HistoryPanel {
     constructor(
@@ -198,30 +199,60 @@ export class HistoryPanel {
             cls: 'pi-chat-welcome',
         });
 
-        let hasContent = false;
+        // 追踪工具调用卡片，按 toolCallId
+        const toolCallMap = new Map<string, ToolCallMsg>();
+
+        const removeWelcome = () => {
+            if (welcomeEl) {
+                welcomeEl.remove();
+            }
+        };
+
         for (const msg of messages) {
             if (msg.role === 'user') {
                 const text = extractTextContent(msg.content);
                 if (text) {
-                    if (welcomeEl) {
-                        welcomeEl.remove();
-                    }
+                    removeWelcome();
                     const el = this.messagesEl.createDiv({ cls: 'pi-chat-msg-user' });
                     el.setText(text);
-                    hasContent = true;
                 }
             } else if (msg.role === 'assistant') {
-                const text = extractTextContent(msg.content);
+                const content = Array.isArray(msg.content) ? msg.content : [];
+
+                // 提取文本内容
+                const text = extractTextContent(content);
+                // 提取工具调用
+                const toolCalls = content.filter((c: any) =>
+                    c.type === 'toolCall' || c.type === 'tool_use');
+
+                if (!text && toolCalls.length === 0) continue;
+
+                removeWelcome();
+                const el = this.messagesEl.createDiv({ cls: 'pi-chat-msg-assistant' });
+
+                // 渲染 Markdown 文字
                 if (text) {
-                    if (welcomeEl) {
-                        welcomeEl.remove();
-                    }
-                    const el = this.messagesEl.createDiv({ cls: 'pi-chat-msg-assistant' });
-                    // 用 Obsidian 的 MarkdownRenderer 渲染历史消息
                     await MarkdownRenderer.render(this.app, text, el, '/', this.messagesEl as any);
-                    // 增强代码块
                     this.enhanceCodeBlocks(el);
-                    hasContent = true;
+                }
+
+                // 渲染工具调用卡片
+                for (const tc of toolCalls) {
+                    const args = tc.input || tc.arguments || {};
+                    const toolName = tc.name || tc.toolName || '';
+                    const toolId = tc.id || '';
+
+                    const wrapper = el.createDiv({ cls: 'pi-chat-tool-wrapper' });
+                    const card = new ToolCallMsg(wrapper, toolName, args);
+                    toolCallMap.set(toolId, card);
+                }
+
+            } else if (msg.role === 'toolResult' || msg.role === 'tool_result') {
+                // 匹配对应的工具调用，填入结果
+                const card = toolCallMap.get(msg.toolCallId);
+                if (card) {
+                    card.setResult(msg, msg.isError || false);
+                    toolCallMap.delete(msg.toolCallId);
                 }
             }
         }
