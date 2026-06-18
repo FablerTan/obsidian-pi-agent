@@ -27,32 +27,33 @@ export class PiRpcClient {
         // pi 的完整路径（macOS Homebrew 安装路径）
         const piPath = '/opt/homebrew/bin/pi';
 
-        this.proc = spawn(piPath, ['--mode', 'rpc'], {
+        // 保存局部引用，用于 exit 处理器判断是否还是同一个进程
+        const proc = spawn(piPath, ['--mode', 'rpc'], {
             cwd,
             stdio: ['pipe', 'pipe', 'pipe'],
         });
+        this.proc = proc;
 
         const readyPromise = new Promise<void>((resolve, reject) => {
-            if (!this.proc) {
-                reject(new Error('Failed to spawn pi'));
-                return;
-            }
-
             // 监听 stdout：pi 返回的事件流
-            this.proc.stdout?.on('data', (chunk: Buffer) => {
+            proc.stdout?.on('data', (chunk: Buffer) => {
                 this.buffer += chunk.toString('utf-8');
                 this.processLines();
             });
 
             // 监听 stderr：错误信息
-            this.proc.stderr?.on('data', (chunk: Buffer) => {
+            proc.stderr?.on('data', (chunk: Buffer) => {
                 console.error('pi stderr:', chunk.toString());
             });
 
-            // 监听进程退出
-            this.proc.on('exit', (code) => {
+            // 监听进程退出（用局部引用判断，避免旧进程退出时覆盖新进程）
+            proc.on('exit', (code) => {
                 console.log(`pi exited with code ${code}`);
-                this.proc = null;
+                // 只有 this.proc 仍然指向当前进程时，才清空它
+                // 防止 restart() 中旧进程的 exit 异步触发覆盖新进程
+                if (this.proc === proc) {
+                    this.proc = null;
+                }
                 if (code !== 0) {
                     reject(new Error(`pi exited with code ${code}`));
                 }
