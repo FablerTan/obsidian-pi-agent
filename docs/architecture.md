@@ -76,8 +76,8 @@ pi → 插件: stdout 逐行输出 JSONL（事件流 + response）
 ```
 
 **启动流程**：
-1. `spawn('/opt/homebrew/bin/pi', ['--mode', 'rpc'])`
-2. 设置 stdout/stderr/exit 监听器
+1. `spawn('/opt/homebrew/bin/pi', ['--mode', 'rpc'])`，用局部变量 `proc` 保存引用
+2. 设置 stdout/stderr/exit 监听器（exit 处理器用 `this.proc === proc` 判断，防止旧进程异步退出覆盖新进程）
 3. 发送 `get_state` 命令确认 pi 就绪
 4. 10 秒超时未响应则 reject
 
