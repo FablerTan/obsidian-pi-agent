@@ -106,10 +106,10 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `clearLoadingTimeout()` | 清除 5 秒超时保护定时器 |
 | `handlePiEvent(event)` | 处理 pi 返回的事件，更新 UI |
 | `getOrCreateAssistantEl()` | 获取或创建当前助手消息气泡容器（DOM 查询 + 缓存） |
-| `loadCommands()` | 从 pi 加载可用命令列表（`get_commands`），传给 CommandMenu |
+| `loadCommands()` | 从 pi 加载可用命令列表（`get_commands`），传给 CommandMenu，同时保存不含 builtins 的命令名和数据到 `previousCmdNames` / `previousCmdList` |
 | `handleNewSession()` | 发送 `new_session` RPC，清空消息列表 + 输入框 + 加载状态 |
 
-| `handleReload()` | 重启 pi 子进程，对比命令列表变化，显示分组详情（新增绿色、移除红色+删除线） |
+| `handleReload()` | 重启 pi 子进程，对比命令列表变化，显示分组详情（新增绿色、移除红色+删除线）；如果 `previousCmdNames` 为空（初始加载未完成），先获取当前命令列表作为对比基准 |
 | `renderReloadGroup(el, label, items, newNames, removedNames)` | 渲染 reload 消息中的一个分组（扩展/技能/模板等），逐项标记新增或移除 |
 | `renderReloadFromCache(el, cmds)` | `get_commands` 失败时用缓存数据回退渲染具体列表 |
 | `handleHistory()` | 打开历史会话浮层（`/history` 命令触发） |

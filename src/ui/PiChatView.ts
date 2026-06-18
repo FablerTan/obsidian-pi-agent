@@ -186,8 +186,8 @@ export class PiChatView extends ItemView {
 
         this.messagesEl = messagesEl;
 
-        // 预加载命令列表
-        this.loadCommands();
+        // 预加载命令列表（作为 reload 对比基准）
+        await this.loadCommands();
     }
 
     async onClose(): Promise<void> {
@@ -354,10 +354,12 @@ export class PiChatView extends ItemView {
                     { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
                     { name: 'history', description: '历史会话', source: 'extension' as const },
                 ];
-                const allCmds = [...builtins, ...resp.data.commands];
+                const cmds: any[] = resp.data.commands;
+                const allCmds = [...builtins, ...cmds];
                 this.commandMenu.setCommands(allCmds);
-                // 保存命令名用于 reload 对比
-                this.previousCmdNames = new Set(allCmds.map((c: any) => c.name));
+                // 保存命令名（不含 builtins）用于 reload 对比
+                this.previousCmdNames = new Set(cmds.map((c: any) => c.name));
+                this.previousCmdList = cmds.map((c: any) => ({ name: c.name, source: c.source || 'other' }));
             }
         } catch { /* pi 还未就绪，忽略 */ }
     }
@@ -432,6 +434,17 @@ export class PiChatView extends ItemView {
         this.commandMenu.hide();
         this.textarea.value = '';
         try {
+            // 确保有对比基准：如果 previousCmdNames 仍为空（onOpen 时加载失败等），先获取一次
+            if (this.previousCmdNames.size === 0) {
+                try {
+                    const initResp = await this.piClient.sendAndWait({ type: 'get_commands' });
+                    if (initResp?.success && initResp.data?.commands) {
+                        const initCmds: any[] = initResp.data.commands;
+                        this.previousCmdNames = new Set(initCmds.map((c: any) => c.name));
+                        this.previousCmdList = initCmds.map((c: any) => ({ name: c.name, source: c.source || 'other' }));
+                    }
+                } catch { /* 忽略，继续 reload */ }
+            }
             new Notice('正在重载 Pi…');
             await this.piClient.restart();
             // 获取重载后的命令列表
