@@ -9,8 +9,15 @@ export class PiRpcClient {
     private buffer = '';
 
     // ── 事件回调 ────────────────────────────────
-    // 外部通过这个字段接收 pi 返回的事件
+    // 外部通过这个字段接收 pi 返回的事件（非 response 类型）
     onEvent: ((event: any) => void) | null = null;
+
+    // ── 挂起的请求 ──────────────────────────────
+    // key=请求ID, value=回调函数，收到对应 response 时调用
+    private pendingRequests: Map<string, (resp: any) => void> = new Map();
+
+    // 自增 ID 计数器
+    private requestIdCounter = 0;
 
     // ── 启动 pi 子进程 ──────────────────────────
     start(cwd: string): void {
@@ -52,13 +59,31 @@ export class PiRpcClient {
     }
 
     // ── 发送 JSON 命令到 pi ─────────────────────
-    send(command: object): void {
+    // 返回请求 ID，可用于关联响应
+    send(command: object): string | null {
         if (!this.proc || !this.proc.stdin) {
             console.error('pi not running');
-            return;
+            return null;
         }
-        const line = JSON.stringify(command) + '\n';
+        // 自动加上递增 ID
+        const id = `req-${++this.requestIdCounter}`;
+        const cmd = { id, ...command };
+        const line = JSON.stringify(cmd) + '\n';
         this.proc.stdin.write(line, 'utf-8');
+        return id;
+    }
+
+    // ── 发送命令并等待响应 ──────────────────────
+    // 返回一个 Promise，收到对应 response 时 resolve
+    sendAndWait(command: object): Promise<any> {
+        return new Promise((resolve) => {
+            const id = this.send(command);
+            if (!id) {
+                resolve({ success: false, error: 'pi not running' });
+                return;
+            }
+            this.pendingRequests.set(id, resolve);
+        });
     }
 
     // ── 快捷发送 prompt ─────────────────────────
@@ -89,6 +114,16 @@ export class PiRpcClient {
 
     // ── 处理收到的事件 ──────────────────────────
     private handleEvent(event: any): void {
+        // 如果是 response 类型且有对应的 pending 请求，走请求回调
+        if (event.type === 'response' && event.id) {
+            const resolve = this.pendingRequests.get(event.id);
+            if (resolve) {
+                this.pendingRequests.delete(event.id);
+                resolve(event);
+                return;
+            }
+        }
+        // 否则走通用事件回调
         if (this.onEvent) {
             this.onEvent(event);
         }

@@ -186,7 +186,7 @@ export class PiChatView extends ItemView {
     }
 
     // ── 打开历史会话列表 ──────────────────────
-    private openHistory(): void {
+    private async openHistory(): Promise<void> {
         // pi 的会话目录：~/.pi/agent/sessions/
         const sessionsDir = path.join(
             os.homedir(),
@@ -212,14 +212,77 @@ export class PiChatView extends ItemView {
         files.sort().reverse();
 
         // 弹出一个选择界面
-        const modal = new HistoryModal(this.app, files, fullDir, (sessionPath) => {
+        const modal = new HistoryModal(this.app, files, fullDir, async (sessionPath) => {
             // 用户选了一个会话，切换到它
-            this.piClient.send({
+            const switchResp = await this.piClient.sendAndWait({
                 type: 'switch_session',
                 sessionPath,
             });
+
+            if (!switchResp?.success) {
+                new Notice('切换会话失败');
+                return;
+            }
+
+            // 获取历史消息
+            const msgResp = await this.piClient.sendAndWait({
+                type: 'get_messages',
+            });
+
+            if (!msgResp?.success) {
+                new Notice('获取消息失败');
+                return;
+            }
+
+            // 清空当前消息列表，渲染历史消息
+            this.loadMessages(msgResp.data.messages || []);
         });
         modal.open();
+    }
+
+    // ── 清空并加载消息 ──────────────────────────
+    private loadMessages(messages: any[]): void {
+        // 清空消息列表（保留欢迎文字）
+        this.messagesEl.empty();
+
+        // 重新显示欢迎文字
+        this.welcomeEl = this.messagesEl.createEl('p', {
+            text: '开始和 Pi 对话吧！',
+            cls: 'pi-chat-welcome',
+        });
+
+        // 遍历消息，只显示用户和助手的对话
+        let hasContent = false;
+        for (const msg of messages) {
+            if (msg.role === 'user') {
+                // 用户消息：从 content 中取文本
+                const text = extractTextContent(msg.content);
+                if (text) {
+                    // 有内容就移除欢迎文字
+                    if (this.welcomeEl) {
+                        this.welcomeEl.remove();
+                        this.welcomeEl = null as any;
+                    }
+                    const el = this.messagesEl.createDiv({ cls: 'pi-chat-msg-user' });
+                    el.setText(text);
+                    hasContent = true;
+                }
+            } else if (msg.role === 'assistant') {
+                // 助手消息
+                const text = extractTextContent(msg.content);
+                if (text) {
+                    if (this.welcomeEl) {
+                        this.welcomeEl.remove();
+                        this.welcomeEl = null as any;
+                    }
+                    const el = this.messagesEl.createDiv({ cls: 'pi-chat-msg-assistant' });
+                    el.setText(text);
+                    hasContent = true;
+                }
+            }
+        }
+
+        this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     }
 
     // 面板被关闭时调用
@@ -273,4 +336,19 @@ class HistoryModal extends Modal {
         const { contentEl } = this;
         contentEl.empty();
     }
+}
+
+// ── 从消息 content 中提取纯文本 ──────────────
+// content 可能是字符串 "Hello" 或数组 [{ type: "text", text: "Hello" }, ...]
+function extractTextContent(content: any): string {
+    if (typeof content === 'string') {
+        return content;
+    }
+    if (Array.isArray(content)) {
+        return content
+            .filter((c: any) => c.type === 'text')
+            .map((c: any) => c.text || '')
+            .join('\n');
+    }
+    return '';
 }
