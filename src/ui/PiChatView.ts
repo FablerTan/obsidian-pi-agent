@@ -452,19 +452,24 @@ export class PiChatView extends ItemView {
             new Notice('正在重载 Pi…');
             await this.piClient.restart();
 
-            // 获取重载后的命令列表（带重试：pi 重启后可能还没完全加载扩展）
-            for (let attempt = 0; attempt < 3; attempt++) {
+            // 持续轮询直到 get_commands 成功（最长等 10 秒，每 800ms 一次）
+            // 期间 isReloading = true，用户无法重复触发
+            let cmds: any[] | null = null;
+            for (let attempt = 0; attempt < 12; attempt++) {
                 if (attempt > 0) {
-                    await new Promise(r => setTimeout(r, 600));
+                    await new Promise(r => setTimeout(r, 800));
                 }
                 const resp = await this.piClient.sendAndWait({ type: 'get_commands' });
                 if (resp?.success && resp.data?.commands) {
-                    this.handleReloadSuccess(resp.data.commands, oldNames, oldCmdList);
-                    return;
+                    cmds = resp.data.commands;
+                    break;
                 }
             }
-            // 3 次都失败，进入缓存回退
-            this.handleReloadFallback(oldCmdList, oldNames);
+            if (cmds) {
+                this.handleReloadSuccess(cmds, oldNames, oldCmdList);
+            } else {
+                new Notice('Pi 重载超时，请重试');
+            }
         } catch {
             new Notice('重载失败');
         } finally {

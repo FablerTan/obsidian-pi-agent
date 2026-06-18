@@ -109,7 +109,7 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `loadCommands()` | 从 pi 加载可用命令列表（`get_commands`），传给 CommandMenu，同时保存不含 builtins 的命令名和数据到 `previousCmdNames` / `previousCmdList` |
 | `handleNewSession()` | 发送 `new_session` RPC，清空消息列表 + 输入框 + 加载状态 |
 
-| `handleReload()` | 重启 pi 子进程，获取命令列表（最多重试 3 次，间隔 600ms），成功则对比变化显示分组详情（新增绿色、移除红色+删除线），失败则缓存回退；一开始就将 `previousCmdNames` 捕获到局部常量 `oldNames` |
+| `handleReload()` | 重启 pi 子进程，持续轮询 `get_commands` 直到成功（最长 10 秒，每 800ms 一次）；期间 `isReloading = true` 阻止重复触发；成功则对比变化显示分组详情（新增绿色、移除红色+删除线），超时则提示「Pi 重载超时，请重试」|
 | `handleReloadSuccess(cmds, oldNames, oldCmdList)` | reload 成功后渲染命令列表分组 + 对比新增/移除，保存新数据 |
 | `handleReloadFallback(oldCmdList, oldNames)` | reload 失败后用缓存数据回退显示，不修改 `previousCmdNames`/`previousCmdList` |
 | `fetchCurrentCmdNames()` | 从当前 pi 进程获取命令名集合，`previousCmdNames` 为空时作为对比基准 |
