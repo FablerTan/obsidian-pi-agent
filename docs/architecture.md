@@ -9,7 +9,10 @@ src/
   pi/
     rpc-client.ts       pi RPC 通信客户端
   ui/
-    PiChatView.ts       聊天面板视图
+    PiChatView.ts       聊天面板视图（核心 UI + 消息流）
+    HistoryPanel.ts     历史会话管理器（读取、浮层、切换）
+  utils/
+    helpers.ts          工具函数（文本提取等）
 
 styles.css              所有 UI 样式
 docs/architecture.md    本文档
@@ -82,7 +85,7 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 
 ---
 
-### 3. `src/ui/PiChatView.ts` — 聊天面板
+### 3. `src/ui/PiChatView.ts` — 聊天面板核心
 
 **职责**：Obsidian 右侧栏的聊天界面，消息展示与输入。
 
@@ -91,17 +94,13 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `onOpen()` | 构建面板 DOM：顶栏、消息列表、历史按钮、输入框 |
 | `onClose()` | 清理事件回调 |
 | `addUserMessage(text)` | 添加用户消息气泡（蓝色，靠右） |
-| `appendAssistantText(text)` | 追加助手回复文字（灰色，靠左） |
+| `appendAssistantText(text)` | 追加助手回复文字（灰色，靠左），流式追加到同一条 |
 | `showLoading()` / `hideLoading()` | 显示/隐藏加载动画（三个跳动圆点） |
 | `handlePiEvent(event)` | 处理 pi 返回的事件，更新 UI |
-| `openHistory()` | 打开历史会话浮层 |
-| `readSessions()` | 从 `~/.pi/agent/sessions/` 读取会话列表 |
-| `switchToSession(path)` | 切换到指定历史会话 |
-| `loadMessages(messages)` | 清空并渲染历史消息 |
 
 **UI 结构**：
 ```
-.pi-chat-wrapper (flex column, 100% 高)
+.pi-chat-wrapper (flex column, 100% 高, position: relative)
   ├── .pi-chat-header (顶栏：pi 图标 + 标题)
   └── .pi-chat-container (flex: 1)
         ├── .pi-chat-messages (消息列表，可滚动)
@@ -118,7 +117,35 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 
 ---
 
-### 4. `src/settings.ts` — 配置管理
+### 4. `src/ui/HistoryPanel.ts` — 历史会话管理器
+
+**职责**：读取 pi 会话文件、显示 iOS 风格底部浮层、切换会话。
+
+| 方法 | 说明 |
+|------|------|
+| `open()` | 创建半透明背景 + 底部浮层，显示会话列表 |
+| `readSessions()` | 从 `~/.pi/agent/sessions/` 读取当前 vault 的会话列表 |
+| `switchToSession(path)` | 发送 `switch_session` + `get_messages`，切换会话 |
+| `loadMessages(messages)` | 清空消息列表，渲染历史消息 |
+
+**构造参数**：`(piClient, messagesEl, contentEl, app)`
+
+**显示优先级**（会话标题）：
+1. header 中的 `name` 字段
+2. 第一条用户消息（取前 40 字）
+3. 时间戳
+
+---
+
+### 5. `src/utils/helpers.ts` — 工具函数
+
+| 函数 | 说明 |
+|------|------|
+| `extractTextContent(content)` | 从消息 content（字符串或数组）中提取纯文本 |
+
+---
+
+### 6. `src/settings.ts` — 配置管理
 
 **职责**：定义设置接口、默认值和设置页面 UI。
 
@@ -150,18 +177,18 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
   → showLoading() → piClient.prompt(msg)
   → rpc-client send({ type:'prompt', message }) → stdin
   → pi 进程处理 → stdout JSONL
-  → processLines() → handleEvent()
-  → onEvent → PiChatView.handlePiEvent()
-  → appendAssistantText() 更新 UI
+  → processLines() → handleEvent() → onEvent
+  → PiChatView.handlePiEvent() → appendAssistantText() 更新 UI
 ```
 
 ```
 点击历史图标
-  → readSessions() 读取 ~/.pi/agent/sessions/
-  → 面板内浮层显示列表
-  → 选中会话 → switchToSession(path)
-  → sendAndWait(switch_session) → sendAndWait(get_messages)
-  → loadMessages() 清空并渲染历史
+  → HistoryPanel.open()
+    → readSessions() 读取 ~/.pi/agent/sessions/
+    → 创建半透明遮罩 + 底部浮层
+    → 选中会话 → switchToSession(path)
+      → sendAndWait(switch_session) → sendAndWait(get_messages)
+      → loadMessages() 清空并渲染历史
 ```
 
 ## 会话存储
