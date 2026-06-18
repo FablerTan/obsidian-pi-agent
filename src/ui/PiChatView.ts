@@ -376,41 +376,38 @@ export class PiChatView extends ItemView {
             this.piClient.sendAndWait({ type: 'get_commands' }).catch(() => null),
         ]);
 
-        // ── [Context] ──
+        // ── Context ──
         if (contextFiles.length > 0) {
-            this.addBlock(sectionsEl, '[Context]', contextFiles.map(f => `  ${f}`));
+            this.addSectionList(sectionsEl, 'file-text', 'Context', contextFiles);
         }
 
         if (cmdResp?.success && cmdResp.data?.commands) {
             const cmds: any[] = cmdResp.data.commands;
 
-            // 打印到控制台方便调试
-            console.log('[Pi Chat] get_commands:', JSON.stringify(cmds));
-
             // 按 source 分组
-            const groups = new Map<string, { title: string; items: string[] }>();
-
+            const groups = new Map<string, { items: string[] }>();
             for (const c of cmds) {
                 const src = c.source || 'other';
-                if (!groups.has(src)) {
-                    const title = '[' + src.charAt(0).toUpperCase() + src.slice(1) + ']';
-                    groups.set(src, { title, items: [] });
-                }
+                if (!groups.has(src)) groups.set(src, { items: [] });
                 groups.get(src)!.items.push(c.name);
             }
 
-            // 按固定顺序输出：Extension / Prompt / Skill / 其他
-            const order = ['extension', 'prompt', 'skill'];
-            for (const key of order) {
+            // 固定顺序 + 图标映射
+            const order: Array<{ key: string; icon: string; label: string }> = [
+                { key: 'extension', icon: 'puzzle', label: 'Extensions' },
+                { key: 'prompt', icon: 'file-plus', label: 'Prompts' },
+                { key: 'skill', icon: 'sparkles', label: 'Skills' },
+            ];
+            for (const { key, icon, label } of order) {
                 const g = groups.get(key);
                 if (g) {
-                    this.addBlock(sectionsEl, g.title, g.items.map(n => `  ${n}`));
+                    this.addSectionList(sectionsEl, icon, label, g.items);
                     groups.delete(key);
                 }
             }
             // 剩余未知类型
-            for (const [, g] of groups) {
-                this.addBlock(sectionsEl, g.title, g.items.map(n => `  ${n}`));
+            for (const [key, g] of groups) {
+                this.addSectionList(sectionsEl, 'terminal', key, g.items);
             }
         }
     }
@@ -422,23 +419,31 @@ export class PiChatView extends ItemView {
             const agentDir = path.join(vaultPath, '.pi', 'agent');
             const files = fs.readdirSync(agentDir);
             return files
-                .filter(f => f.endsWith('.md') || f.endsWith('.txt') || f.endsWith('.md'))
+                .filter(f => f.endsWith('.md') || f.endsWith('.txt'))
                 .sort();
         } catch {
             return [];
         }
     }
 
-    // ── 添加一个区块（标题 + 行列表） ────────────
-    private addBlock(
-        parent: Element, title: string, lines: string[],
+    // ── 添加带图标和标题的列表区块 ────────────
+    private addSectionList(
+        parent: Element, icon: string, title: string, items: string[],
     ): void {
-        if (lines.length === 0) return;
+        if (items.length === 0) return;
 
-        const block = parent.createDiv({ cls: 'pi-welcome-block' });
-        block.createDiv({ cls: 'pi-welcome-block-title', text: title });
-        for (const line of lines) {
-            block.createDiv({ cls: 'pi-welcome-block-line', text: line });
+        const section = parent.createDiv({ cls: 'pi-welcome-section' });
+
+        // 标题行（图标 + 标题）
+        const titleRow = section.createDiv({ cls: 'pi-welcome-section-title' });
+        const iconEl = titleRow.createSpan({ cls: 'pi-welcome-section-icon' });
+        setIcon(iconEl, icon);
+        titleRow.createSpan({ cls: 'pi-welcome-section-label', text: title });
+
+        // 列表
+        const list = section.createEl('ul', { cls: 'pi-welcome-list' });
+        for (const item of items) {
+            list.createEl('li', { cls: 'pi-welcome-list-item', text: item });
         }
     }
 
