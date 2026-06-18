@@ -58,7 +58,9 @@ export class PiChatView extends ItemView {
 
         // Enter 发送消息给 pi，Shift+Enter 换行
         textarea.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            // e.isComposing 为 true 表示正在输入法选词中
+            // 此时按 Enter 应该是确认选词，而不是发送消息
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
                 e.preventDefault();
                 const msg = textarea.value.trim();
                 if (!msg) return;
