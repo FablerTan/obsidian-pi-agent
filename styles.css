@@ -25,6 +25,14 @@ If your plugin does not need CSS, delete this file.
     position: relative; /* 给命令菜单做定位基准 */
 }
 
+/* 输入区域容器（命令菜单 + 输入框 + 状态栏），贴底部 */
+.pi-chat-input-area {
+    margin-top: auto;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+}
+
 /* 消息列表区域，可滚动 */
 .pi-chat-messages {
     flex: 1;
@@ -36,24 +44,6 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* ── 历史图标（输入框上方靠右） ────── */
-.pi-chat-history-bar {
-    display: flex;
-    justify-content: flex-end;
-    padding: 4px 6px 4px 0;
-    flex-shrink: 0;
-}
-
-.pi-chat-history-btn {
-    width: 16px;
-    height: 16px;
-    color: var(--text-faint);
-    cursor: pointer;
-}
-
-.pi-chat-history-btn:hover {
-    color: var(--text-muted);
-}
-
 /* ── 历史会话底部浮层（类似 iOS 风格） ── */
 .pi-history-backdrop {
     position: absolute;

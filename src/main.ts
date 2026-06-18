@@ -37,7 +37,7 @@ export default class PiChatPlugin extends Plugin {
 		);
 
 		// 左侧栏图标，点击打开聊天面板
-		this.addRibbonIcon('message-square', 'Open Pi Chat', () => {
+		this.addRibbonIcon('pi-logo', 'Open Pi Chat', () => {
 			this.activatePiChatView();
 		});
 

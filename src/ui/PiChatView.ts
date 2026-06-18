@@ -42,6 +42,12 @@ export class PiChatView extends ItemView {
     // 底部状态栏（模型 + 思考层级）
     private inputStatusBar!: InputStatusBar;
 
+    // 输入框
+    private textarea!: HTMLTextAreaElement;
+
+    // 5 秒超时保护定时器
+    private loadingTimeout: number | null = null;
+
     // RPC 客户端
     private piClient: PiRpcClient;
 
@@ -61,6 +67,10 @@ export class PiChatView extends ItemView {
 
     getDisplayText(): string {
         return 'Pi Chat';
+    }
+
+    getIcon(): string {
+        return 'pi-logo';
     }
 
     // ── 构建 UI ──────────────────────────────────
@@ -83,23 +93,21 @@ export class PiChatView extends ItemView {
         this.welcomeEl = this.createWelcomeEl(messagesEl);
         this.loadWelcomeData();
 
-        // 历史会话按钮（输入框上方靠右）
+        // 历史会话管理器（通过 /history 命令触发）
         this.historyPanel = new HistoryPanel(this.piClient, messagesEl, contentEl, this.app);
-        const historyBar = container.createDiv({ cls: 'pi-chat-history-bar' });
-        const historyIcon = historyBar.createEl('span', { cls: 'pi-chat-history-btn' });
-        setIcon(historyIcon, 'history');
-        historyIcon.addEventListener('click', () => {
-            this.historyPanel.open();
-        });
+
+        // ── 输入区域（自动撑到最底部） ──
+        const inputArea = container.createDiv({ cls: 'pi-chat-input-area' });
 
         // ── 命令菜单容器（在 DOM 中位于输入框正上方，靠文档流排列） ──
-        const menuContainer = container.createDiv({ cls: 'pi-command-menu' });
+        const menuContainer = inputArea.createDiv({ cls: 'pi-command-menu' });
 
         // 输入框
-        const textarea = container.createEl('textarea', {
+        this.textarea = inputArea.createEl('textarea', {
             cls: 'pi-chat-input',
             placeholder: '输入消息... (Enter 发送, Shift+Enter 换行)',
         });
+        const textarea = this.textarea;
 
         // ── 命令菜单（输入 / 时弹出） ──
         this.commandMenu = new CommandMenu(menuContainer, textarea, (cmd) => {
@@ -107,6 +115,8 @@ export class PiChatView extends ItemView {
                 this.handleNewSession();
             } else if (cmd.name === 'reload') {
                 this.handleReload();
+            } else if (cmd.name === 'history') {
+                this.handleHistory();
             } else {
                 textarea.value = '/' + cmd.name + ' ';
                 textarea.focus();
@@ -126,8 +136,8 @@ export class PiChatView extends ItemView {
 
         // Enter 发送，Shift+Enter 换行，Esc 打断
         textarea.addEventListener('keydown', (e) => {
-            // 如果命令菜单开着，优先让菜单处理键盘事件
-            if (this.commandMenu.isVisible()) {
+            // 如果命令菜单开着，优先让菜单处理键盘事件（IME 组词中不拦截）
+            if (this.commandMenu.isVisible() && !e.isComposing) {
                 const handled = this.commandMenu.handleKeydown(e);
                 if (handled) return;
             }
@@ -148,17 +158,18 @@ export class PiChatView extends ItemView {
                 this.piClient.prompt(msg);
 
                 // 5 秒超时保护
-                setTimeout(() => {
+                this.loadingTimeout = window.setTimeout(() => {
                     if (this.loadingEl) {
                         this.hideLoading();
                         new Notice('Pi 没有响应，请检查 pi 是否正常运行');
                     }
+                    this.loadingTimeout = null;
                 }, 5000);
             }
         });
 
         // ── 底部状态栏（模型 + 思考层级） ──
-        this.inputStatusBar = new InputStatusBar(container, this.piClient);
+        this.inputStatusBar = new InputStatusBar(inputArea, this.piClient);
 
         this.messagesEl = messagesEl;
 
@@ -212,6 +223,13 @@ export class PiChatView extends ItemView {
         if (this.loadingEl) {
             this.loadingEl.remove();
             this.loadingEl = null;
+        }
+    }
+
+    private clearLoadingTimeout(): void {
+        if (this.loadingTimeout !== null) {
+            clearTimeout(this.loadingTimeout);
+            this.loadingTimeout = null;
         }
     }
 
@@ -312,6 +330,7 @@ export class PiChatView extends ItemView {
                 const builtins = [
                     { name: 'new', description: '新建会话', source: 'extension' as const },
                     { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
+                    { name: 'history', description: '历史会话', source: 'extension' as const },
                 ];
                 this.commandMenu.setCommands([...builtins, ...resp.data.commands]);
             }
@@ -322,7 +341,10 @@ export class PiChatView extends ItemView {
 
     // ── 处理 /new ──────────────────────────────
     private async handleNewSession(): Promise<void> {
+        this.clearLoadingTimeout();
+        this.hideLoading();
         this.commandMenu.hide();
+        this.textarea.value = '';
         try {
             const resp = await this.piClient.sendAndWait({ type: 'new_session' });
             if (resp?.success) {
@@ -345,6 +367,8 @@ export class PiChatView extends ItemView {
 
     // ── 打断 AI 输出 ──────────────────────────
     private abort(): void {
+        // 清除超时定时器
+        this.clearLoadingTimeout();
         // 关闭命令菜单（如果开着）
         this.commandMenu.hide();
         // 发送 abort RPC
@@ -357,9 +381,19 @@ export class PiChatView extends ItemView {
         new Notice('已打断');
     }
 
+    // ── 处理 /history ──────────────────────────
+    private handleHistory(): void {
+        this.commandMenu.hide();
+        this.textarea.value = '';
+        this.historyPanel.open();
+    }
+
     // ── 处理 /reload ──────────────────────────
     private async handleReload(): Promise<void> {
+        this.clearLoadingTimeout();
+        this.hideLoading();
         this.commandMenu.hide();
+        this.textarea.value = '';
         try {
             // 尝试通过 prompt 发送 reload 命令
             this.piClient.prompt('/reload');
