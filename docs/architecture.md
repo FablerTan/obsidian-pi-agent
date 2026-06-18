@@ -44,6 +44,7 @@ docs/architecture.md    本文档
 2. 创建 `PiRpcClient`，传入 vault 路径并启动
 3. 注册 `PI_CHAT_VIEW_TYPE` 视图，把 `PiRpcClient` 传给 `PiChatView`
 4. 侧栏图标绑定 `activatePiChatView()`
+5. 注册命令面板命令 `Pi Agent: 打开聊天面板`，同样绑定 `activatePiChatView()`
 
 **状态**：
 - `settings` — 用户配置

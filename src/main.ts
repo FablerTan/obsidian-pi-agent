@@ -41,6 +41,14 @@ export default class PiChatPlugin extends Plugin {
 			this.activatePiChatView();
 		});
 
+		// 命令面板（Cmd+P）中注册打开聊天面板的命令
+		this.addCommand({
+			id: 'open-pi-chat-view',
+			name: 'Pi Agent: 打开聊天面板',
+			icon: 'pi-logo',
+			callback: () => this.activatePiChatView(),
+		});
+
 		// 设置页面
 		this.addSettingTab(new PiChatSettingTab(this.app, this));
 	}
