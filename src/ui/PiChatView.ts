@@ -103,8 +103,14 @@ export class PiChatView extends ItemView {
 
         // ── 命令菜单（输入 / 时弹出） ──
         this.commandMenu = new CommandMenu(menuContainer, textarea, (cmd) => {
-            textarea.value = '/' + cmd.name + ' ';
-            textarea.focus();
+            if (cmd.name === 'new') {
+                this.handleNewSession();
+            } else if (cmd.name === 'reload') {
+                this.handleReload();
+            } else {
+                textarea.value = '/' + cmd.name + ' ';
+                textarea.focus();
+            }
         });
 
         // 输入变化时检测 / 命令
@@ -296,10 +302,52 @@ export class PiChatView extends ItemView {
         try {
             const resp = await this.piClient.sendAndWait({ type: 'get_commands' });
             if (resp?.success && resp.data?.commands) {
-                this.commandMenu.setCommands(resp.data.commands);
+                // 在前面加上内置命令（不走 text prompt，直接发 RPC）
+                const builtins = [
+                    { name: 'new', description: '新建会话', source: 'extension' as const },
+                    { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
+                ];
+                this.commandMenu.setCommands([...builtins, ...resp.data.commands]);
             }
         } catch {
             // pi 还未就绪，忽略
+        }
+    }
+
+    // ── 处理 /new ──────────────────────────────
+    private async handleNewSession(): Promise<void> {
+        this.commandMenu.hide();
+        try {
+            const resp = await this.piClient.sendAndWait({ type: 'new_session' });
+            if (resp?.success) {
+                // 清空消息列表
+                this.messagesEl.empty();
+                this.currentMarkdown = null;
+                this.currentAssistantEl = null;
+                this.toolCalls.clear();
+                // 重新显示欢迎文字
+                this.welcomeEl = this.messagesEl.createEl('p', {
+                    text: '开始和 Pi 对话吧！',
+                    cls: 'pi-chat-welcome',
+                });
+                new Notice('已创建新会话');
+            } else {
+                new Notice('新建会话失败');
+            }
+        } catch {
+            new Notice('新建会话失败');
+        }
+    }
+
+    // ── 处理 /reload ──────────────────────────
+    private async handleReload(): Promise<void> {
+        this.commandMenu.hide();
+        try {
+            // 尝试通过 prompt 发送 reload 命令
+            this.piClient.prompt('/reload');
+            new Notice('正在重新加载…');
+        } catch {
+            new Notice('重新加载失败');
         }
     }
 
