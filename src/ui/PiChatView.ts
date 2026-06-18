@@ -523,10 +523,8 @@ export class PiChatView extends ItemView {
     private updateSelectionDisplay(): void {
         if (this.selectedText) {
             const charCount = this.selectedText.length;
-            const text = this.selectedText;
-            const lineCount = text.endsWith('\n')
-                ? text.split('\n').length - 1
-                : text.split('\n').length;
+            // 过滤掉完全空的行（末尾空行、中间空行都不计入）
+            const lineCount = this.selectedText.split('\n').filter(l => l.length > 0).length;
             this.selectionInfoEl.setText(`「选中 ${lineCount} 行 ${charCount} 字」`);
             this.selectionInfoEl.toggleClass('pi-chat-selection-active', true);
         } else {
