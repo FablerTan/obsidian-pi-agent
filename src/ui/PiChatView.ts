@@ -382,27 +382,35 @@ export class PiChatView extends ItemView {
         }
 
         if (cmdResp?.success && cmdResp.data?.commands) {
-            const cmds = cmdResp.data.commands;
+            const cmds: any[] = cmdResp.data.commands;
 
-            // ── [Skills] ──
-            const skills = cmds.filter((c: any) => c.source === 'skill');
-            if (skills.length > 0) {
-                this.addBlock(sectionsEl, '[Skills]',
-                    skills.map((c: any) => `  ${c.name.replace(/^skill:/, '')}`));
+            // 打印到控制台方便调试
+            console.log('[Pi Chat] get_commands:', JSON.stringify(cmds));
+
+            // 按 source 分组
+            const groups = new Map<string, { title: string; items: string[] }>();
+
+            for (const c of cmds) {
+                const src = c.source || 'other';
+                if (!groups.has(src)) {
+                    const title = '[' + src.charAt(0).toUpperCase() + src.slice(1) + ']';
+                    groups.set(src, { title, items: [] });
+                }
+                groups.get(src)!.items.push(c.name);
             }
 
-            // ── [Prompts] ──
-            const prompts = cmds.filter((c: any) => c.source === 'prompt');
-            if (prompts.length > 0) {
-                this.addBlock(sectionsEl, '[Prompts]',
-                    prompts.map((c: any) => `  /${c.name}`));
+            // 按固定顺序输出：Extension / Prompt / Skill / 其他
+            const order = ['extension', 'prompt', 'skill'];
+            for (const key of order) {
+                const g = groups.get(key);
+                if (g) {
+                    this.addBlock(sectionsEl, g.title, g.items.map(n => `  ${n}`));
+                    groups.delete(key);
+                }
             }
-
-            // ── [Extensions] ──
-            const extensions = cmds.filter((c: any) => c.source === 'extension');
-            if (extensions.length > 0) {
-                this.addBlock(sectionsEl, '[Extensions]',
-                    extensions.map((c: any) => `  ${c.name}`));
+            // 剩余未知类型
+            for (const [, g] of groups) {
+                this.addBlock(sectionsEl, g.title, g.items.map(n => `  ${n}`));
             }
         }
     }
