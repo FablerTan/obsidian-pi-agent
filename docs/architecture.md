@@ -59,6 +59,7 @@ docs/architecture.md    本文档
 |------|------|
 | `start(cwd)` | 启动 `pi --mode rpc` 子进程，等待就绪后 resolve |
 | `stop()` | 杀掉 pi 子进程 |
+| `restart()` | 停止并重新启动子进程（让新增 skill/extension 生效） |
 | `send(command)` | 发送 JSON 命令到 pi，自动添加递增 ID。返回 ID |
 | `sendAndWait(command)` | 发送命令并返回 Promise，等待对应的 response |
 | `prompt(message)` | 快捷发送 `{ type: 'prompt', message }` |
@@ -108,6 +109,7 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `loadCommands()` | 从 pi 加载可用命令列表（`get_commands`），传给 CommandMenu |
 | `handleNewSession()` | 发送 `new_session` RPC，清空消息列表 + 输入框 + 加载状态 |
 
+| `handleReload()` | 重启 pi 子进程（让新增 skill/extension 生效） |
 | `handleHistory()` | 打开历史会话浮层（`/history` 命令触发） |
 | `abort()` | 发送 `abort` RPC，重置 UI 状态，清除超时定时器 |
 | `extractTextFromContent(content)` | 从 content 数组中提取纯文本 |
@@ -162,6 +164,7 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | 命令 | 处理 |
 |------|------|
 | `/new` | 调用 `handleNewSession()`，清空会话 + 输入框 + 加载状态 |
+| `/reload` | 调用 `handleReload()`，重启 pi 子进程，重新加载 skill/extension |
 | `/history` | 调用 `handleHistory()`，打开历史会话浮层 |
 | 其他 | 填入 `/命令名 ` 到输入框继续编辑 |
 

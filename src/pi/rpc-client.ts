@@ -21,6 +21,7 @@ export class PiRpcClient {
 
     // ── 启动 pi 子进程（异步，等 pi 准备好后 resolve） ─
     start(cwd: string): Promise<void> {
+        this.cwd = cwd;
         console.log(`Starting pi RPC in ${cwd}`);
 
         // pi 的完整路径（macOS Homebrew 安装路径）
@@ -72,12 +73,25 @@ export class PiRpcClient {
         return readyPromise;
     }
 
+    // 记住工作目录，重启时复用
+    private cwd = '';
+
     // ── 停止 pi 子进程 ──────────────────────────
     stop(): void {
         if (this.proc) {
             this.proc.kill();
             this.proc = null;
         }
+    }
+
+    // ── 重启 pi 子进程（让新增 skill/extension 生效） ──
+    async restart(): Promise<void> {
+        this.stop();
+        // 清空挂起的请求（重启后旧请求作废）
+        this.pendingRequests.clear();
+        this.buffer = '';
+        this.requestIdCounter = 0;
+        await this.start(this.cwd);
     }
 
     // ── 发送 JSON 命令到 pi ─────────────────────
