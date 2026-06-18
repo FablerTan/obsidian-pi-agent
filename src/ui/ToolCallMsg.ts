@@ -34,6 +34,7 @@ export class ToolCallMsg {
     private toggleIcon!: HTMLElement;
     private outputPre: HTMLElement | null = null;
     private state: ViewState = 'limited';  // 默认限制模式
+    private _hasManyLines = false;          // 输出是否超过5行
 
     constructor(
         private container: HTMLElement,
@@ -115,10 +116,12 @@ export class ToolCallMsg {
         return '';
     }
 
-    // ── 循环切换状态：collapsed → limited → expanded → collapsed ──
+    // ── 循环切换状态 ──────────────────────────
+    // 超过5行时: collapsed → limited → expanded → collapsed
+    // 不超过5行时: collapsed → expanded → collapsed
     private cycleState(): void {
         const next: Record<ViewState, ViewState> = {
-            collapsed: 'limited',
+            collapsed: this._hasManyLines ? 'limited' : 'expanded',
             limited: 'expanded',
             expanded: 'collapsed',
         };
@@ -182,9 +185,12 @@ export class ToolCallMsg {
         }
         this.outputPre.setText(text);
 
+        // 检查行数：超过5行才启用限制态
+        this._hasManyLines = (text.match(/\n/g) || []).length >= 5;
+
         // 有输出时至少切换到限制模式（如果当前是收起态）
         if (this.state === 'collapsed') {
-            this.state = 'limited';
+            this.state = this._hasManyLines ? 'limited' : 'expanded';
             this.applyState();
         }
     }
