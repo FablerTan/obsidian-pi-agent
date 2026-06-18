@@ -94,15 +94,28 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 
 | 方法 | 说明 |
 |------|------|
-| `onOpen()` | 构建面板 DOM：顶栏、消息列表、历史按钮、输入框 |
+| `onOpen()` | 构建面板 DOM：顶栏、消息列表、输入框及状态栏 |
 | `onClose()` | 清理事件回调 |
+| `getIcon()` | 返回面板标签页图标名 `pi-logo`（拖拽移动用） |
 | `addUserMessage(text)` | 添加用户消息气泡（蓝色，靠右） |
 | `appendAssistantText(text)` | 追加助手回复文字（灰色，靠左），流式追加到同一条 |
 | `showLoading()` / `hideLoading()` | 显示/隐藏加载动画（三个跳动圆点） |
+| `clearLoadingTimeout()` | 清除 5 秒超时保护定时器 |
 | `handlePiEvent(event)` | 处理 pi 返回的事件，更新 UI |
 | `getOrCreateAssistantEl()` | 获取或创建当前助手消息气泡容器（DOM 查询 + 缓存） |
 | `loadCommands()` | 从 pi 加载可用命令列表（`get_commands`），传给 CommandMenu |
+| `handleNewSession()` | 发送 `new_session` RPC，清空消息列表 + 输入框 + 加载状态 |
+| `handleReload()` | 发送 `prompt('/reload')`，清空输入框 + 加载状态 |
+| `handleHistory()` | 打开历史会话浮层（`/history` 命令触发） |
+| `abort()` | 发送 `abort` RPC，重置 UI 状态，清除超时定时器 |
 | `extractTextFromContent(content)` | 从 content 数组中提取纯文本 |
+
+**关键字段**：
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `textarea` | `HTMLTextAreaElement` | 输入框引用，/new 等命令需要清空 |
+| `loadingTimeout` | `number \| null` | 5 秒超时保护定时器 ID，可精确清除 |
+| `currentAssistantEl` | `HTMLElement \| null` | 当前助手气泡容器（文字 + 工具卡片共享） |
 
 **UI 结构**：
 ```
@@ -110,8 +123,10 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
   ├── .pi-chat-header (顶栏：pi 图标 + 标题)
   └── .pi-chat-container (flex: 1)
         ├── .pi-chat-messages (消息列表，可滚动)
-        ├── .pi-chat-history-bar (历史图标，靠右)
-        └── .pi-chat-input (输入框)
+        └── .pi-chat-input-area (margin-top: auto, 贴底)
+              ├── .pi-command-menu (/ 命令弹出列表)
+              ├── .pi-chat-input (textarea 输入框)
+              └── .pi-input-status-bar (模型 + 思考层级)
 ```
 
 **事件驱动**（已处理的事件类型）：
@@ -124,19 +139,22 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `tool_execution_end` | 标记 ToolCallMsg 完成/失败，显示结果 |
 | `agent_end` | 回复完成，重置 `currentMarkdown` 和 `toolCalls` |
 | `error` / `extension_error` | 显示错误 Notice |
-| `toolcall_start` | 隐藏加载动画（纯工具回复无文字时，在 message_update 内） |
 
 **追踪状态**：
 - `toolCalls: Map<string, ToolCallMsg>` — 以 `toolCallId` 为键，追踪正在执行的工具
 
-**命令菜单**（详见 CommandMenu.ts）：
-- 输入 `/` 时弹出命令列表
-- 按 `↑` `↓` 切换，`Enter` 确认，`Escape` 关闭
-- 继续打字按 `startsWith` 筛选
-- 空格或删除 `/` 自动关闭
-- 命令在 `onOpen()` 时通过 `loadCommands()` 预加载
+**内置 `/` 命令**：
+| 命令 | 处理 |
+|------|------|
+| `/new` | 调用 `handleNewSession()`，清空会话 + 输入框 + 加载状态 |
+| `/reload` | 调用 `handleReload()`，发送 prompt 重载扩展 + 清空输入框 |
+| `/history` | 调用 `handleHistory()`，打开历史会话浮层 |
+| 其他 | 填入 `/命令名 ` 到输入框继续编辑 |
 
-**超时保护**：发消息后 5 秒无回复，移除加载动画并提示。
+**安全机制**：
+1. **IME 兼容**：`keydown` 中检查 `e.isComposing`，IME 组词期间不拦截 Enter 键，避免组词内容回填
+2. **输出中禁发**：AI 正在输出（loadingEl / currentMarkdown / toolCalls 非空）时，Enter 静默忽略，需先 Esc 打断
+3. **超时保护**：发消息后 5 秒无回复，移除加载动画并提示；`/new` `/reload` `abort` 时主动清除定时器
 
 ---
 
