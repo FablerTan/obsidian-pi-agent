@@ -1,4 +1,5 @@
 // 命令菜单 —— 输入 / 时弹出命令列表，支持键盘导航和筛选
+// 菜单容器在 DOM 中位于输入框正上方，靠正常文档流排列
 import { setIcon } from 'obsidian';
 
 export interface CommandItem {
@@ -10,7 +11,6 @@ export interface CommandItem {
 }
 
 export class CommandMenu {
-    private overlayEl: HTMLElement | null = null;
     private listEl: HTMLElement | null = null;
     private items: CommandItem[] = [];
     private filtered: CommandItem[] = [];
@@ -18,10 +18,13 @@ export class CommandMenu {
     private _visible = false;
 
     constructor(
-        private container: HTMLElement,       // 定位容器（.pi-chat-container）
+        private menuEl: HTMLElement,          // 菜单容器（在 DOM 中位于输入框正上方）
         private textarea: HTMLTextAreaElement,
         private onSelect: (cmd: CommandItem) => void,
-    ) {}
+    ) {
+        // 默认隐藏
+        this.menuEl.hidden = true;
+    }
 
     // ── 设置可用命令列表 ──────────────────────
     setCommands(items: CommandItem[]): void {
@@ -42,11 +45,9 @@ export class CommandMenu {
     // ── 隐藏菜单 ──────────────────────────────
     hide(): void {
         this._visible = false;
-        if (this.overlayEl) {
-            this.overlayEl.remove();
-            this.overlayEl = null;
-            this.listEl = null;
-        }
+        this.menuEl.empty();
+        this.menuEl.hidden = true;
+        this.listEl = null;
     }
 
     isVisible(): boolean {
@@ -80,19 +81,16 @@ export class CommandMenu {
         return false;
     }
 
-    // ── 渲染菜单 ──────────────────────────────
+    // ── 渲染菜单列表 ──────────────────────────
     private render(): void {
-        // 移除旧菜单
-        if (this.overlayEl) {
-            this.overlayEl.remove();
-            this.overlayEl = null;
-            this.listEl = null;
-        }
+        this.menuEl.empty();
+        this.menuEl.hidden = true;
+        this.listEl = null;
 
         if (this.filtered.length === 0) return;
 
-        this.overlayEl = this.container.createDiv({ cls: 'pi-command-menu' });
-        this.listEl = this.overlayEl.createEl('ul', { cls: 'pi-command-list' });
+        this.menuEl.hidden = false;
+        this.listEl = this.menuEl.createEl('ul', { cls: 'pi-command-list' });
 
         this.filtered.forEach((cmd, i) => {
             const li = this.listEl!.createEl('li', { cls: 'pi-command-item' });

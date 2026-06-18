@@ -367,19 +367,16 @@ If your plugin does not need CSS, delete this file.
 
 
 /* ── 命令菜单（/ 命令自动补全） ────────── */
+/* 菜单在 DOM 中位于输入框正上方，靠文档流自然排列 */
 .pi-command-menu {
-    position: absolute;
-    bottom: 100%;          /* 贴在输入框上方 */
-    left: 4px;
-    right: 4px;
     max-height: 220px;
     overflow-y: auto;
     background: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
     border-radius: 8px;
-    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
-    z-index: 50;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
     margin-bottom: 4px;
+    flex-shrink: 0;          /* 在 flex 容器中不压缩 */
 }
 
 .pi-command-list {

@@ -88,6 +88,9 @@ export class PiChatView extends ItemView {
             this.historyPanel.open();
         });
 
+        // ── 命令菜单容器（在 DOM 中位于输入框正上方，靠文档流排列） ──
+        const menuContainer = container.createDiv({ cls: 'pi-command-menu' });
+
         // 输入框
         const textarea = container.createEl('textarea', {
             cls: 'pi-chat-input',
@@ -95,7 +98,7 @@ export class PiChatView extends ItemView {
         });
 
         // ── 命令菜单（输入 / 时弹出） ──
-        this.commandMenu = new CommandMenu(container, textarea, (cmd) => {
+        this.commandMenu = new CommandMenu(menuContainer, textarea, (cmd) => {
             textarea.value = '/' + cmd.name + ' ';
             textarea.focus();
         });
