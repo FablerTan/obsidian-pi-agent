@@ -20,9 +20,6 @@ export class PiChatView extends ItemView {
     // 加载动画元素（发送消息后、收到回复前显示）
     private loadingEl: HTMLDivElement | null = null;
 
-    // 是否已设置过会话名称（只在首次发消息时设置一次）
-    private sessionNamed = false;
-
     // RPC 客户端
     private piClient: PiRpcClient;
 
@@ -106,14 +103,6 @@ export class PiChatView extends ItemView {
 
                 // 发送给 pi
                 this.piClient.prompt(msg);
-
-                // 首次发消息时，用消息内容设置会话名称
-                // 这样历史列表里显示的是消息摘要，而不是时间戳
-                if (!this.sessionNamed) {
-                    this.sessionNamed = true;
-                    const name = msg.length > 30 ? msg.slice(0, 30) + '...' : msg;
-                    this.piClient.send({ type: 'set_session_name', name });
-                }
 
                 // 如果 pi 没响应，5 秒后移除加载动画
                 setTimeout(() => {
