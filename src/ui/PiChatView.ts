@@ -466,18 +466,23 @@ export class PiChatView extends ItemView {
     private updateCurrentNote(): void {
         const file = this.app.workspace.getActiveFile();
         if (file) {
+            // 切换到了不同的文件 → 清空上次选中
+            if (file.path !== this.currentNotePath) {
+                this.selectedText = '';
+            }
             this.currentNotePath = file.path;
             this.currentNoteName = file.name;
             this.noteNameEl.setText(file.name);
             this.noteBarEl.toggleClass('pi-chat-note-empty', false);
         } else {
+            // 没有活动文件 → 清空笔记和选中
             this.currentNotePath = null;
             this.currentNoteName = null;
+            this.selectedText = '';
             this.noteNameEl.setText('无活动笔记');
             this.noteBarEl.toggleClass('pi-chat-note-empty', true);
         }
-        // 切换笔记时也刷新选中文本
-        this.updateSelectedText();
+        this.updateSelectionDisplay();
     }
 
     // ── 在焦点转移前抓取选区 ──────────────────
@@ -497,15 +502,13 @@ export class PiChatView extends ItemView {
         const editor = this.app.workspace.activeEditor?.editor;
         if (editor) {
             const sel = editor.getSelection();
-            // 只有编辑器有实际选中内容时才更新，失焦导致的空选区不覆盖
+            // 只有编辑器有实际选中内容时才更新
+            // 失焦/点到别处导致的空选区不覆盖 lastSelectedText
             if (sel) {
                 this.selectedText = sel;
             }
-            // 如果编辑器存在但选区为空，保留上次选中（用户只是点到了别处）
-        } else {
-            // 编辑器不在了（关闭了文件），才清空
-            this.selectedText = '';
         }
+        // activeEditor 为 null 不处理，保留上次选中
         this.updateSelectionDisplay();
     }
 
