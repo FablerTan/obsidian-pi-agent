@@ -1,7 +1,10 @@
 // 导入 Obsidian 的 ItemView 基类
 // ItemView: 可以在 Obsidian 工作区中创建自定义面板
 // WorkspaceLeaf: 每个视图都挂在一个"叶子"上
-import { ItemView, WorkspaceLeaf, Notice, setIcon } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, setIcon, Modal } from 'obsidian';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import { PiRpcClient } from '../pi/rpc-client';
 
 // 视图的唯一标识符，用来注册和查找这个视图
@@ -64,8 +67,17 @@ export class PiChatView extends ItemView {
             cls: 'pi-chat-welcome',
         });
 
+        // ── 底部工具栏（历史按钮） ────────────
+        const toolbar = container.createDiv({ cls: 'pi-chat-toolbar' });
+        const historyBtn = toolbar.createEl('button', {
+            cls: 'pi-chat-history-btn',
+            text: '📋 历史',
+        });
+        historyBtn.addEventListener('click', () => {
+            this.openHistory();
+        });
+
         // ── 底部输入框 ────────────────────────
-        // 只保留 textarea，去掉发送按钮
         const textarea = container.createEl('textarea', {
             cls: 'pi-chat-input',
             placeholder: '输入消息... (Enter 发送, Shift+Enter 换行)',
@@ -173,9 +185,90 @@ export class PiChatView extends ItemView {
         }
     }
 
+    // ── 打开历史会话列表 ──────────────────────
+    private openHistory(): void {
+        // pi 的会话目录：~/.pi/agent/sessions/
+        const sessionsDir = path.join(
+            os.homedir(),
+            '.pi', 'agent', 'sessions',
+        );
+
+        // 当前 vault 路径对应的会话子目录名
+        // pi 把路径中的 / 替换为 -，前面加 --
+        const projectDir = '--' + (this.app.vault.adapter as any).basePath.replace(/\//g, '-') + '--';
+        const fullDir = path.join(sessionsDir, projectDir);
+
+        let files: string[] = [];
+        try {
+            files = fs.readdirSync(fullDir).filter(f => f.endsWith('.jsonl'));
+        } catch {
+            new Notice('没有找到历史会话');
+            return;
+        }
+
+        // 按文件名倒序（最新的在前面）
+        files.sort().reverse();
+
+        // 弹出一个选择界面
+        const modal = new HistoryModal(this.app, files, fullDir, (sessionPath) => {
+            // 用户选了一个会话，切换到它
+            this.piClient.send({
+                type: 'switch_session',
+                sessionPath,
+            });
+        });
+        modal.open();
+    }
+
     // 面板被关闭时调用
     async onClose(): Promise<void> {
         // 清理事件回调
         this.piClient.onEvent = null;
+    }
+}
+
+// ── 历史会话选择弹窗 ──────────────────────────
+class HistoryModal extends Modal {
+    constructor(
+        app: any,
+        private files: string[],
+        private dir: string,
+        private onSelect: (sessionPath: string) => void,
+    ) {
+        super(app);
+    }
+
+    onOpen(): void {
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.createEl('h2', { text: '历史会话' });
+
+        if (this.files.length === 0) {
+            contentEl.createEl('p', { text: '没有历史会话' });
+            return;
+        }
+
+        const list = contentEl.createEl('ul', { cls: 'pi-history-list' });
+
+        for (const file of this.files) {
+            // 文件名: 2026-06-14T15-24-55-995Z_xxx.jsonl
+            // 取下划线前的时间部分，把 T 替换为空格，去掉毫秒和 Z
+            const dateStr = file.split('_')[0] || file;
+            const displayTime = (dateStr || '')
+                .replace(/T/, ' ')
+                .replace(/-\d+Z$/, '');
+
+            const item = list.createEl('li', { cls: 'pi-history-item' });
+            item.setText(displayTime);
+            item.addEventListener('click', () => {
+                this.onSelect(path.join(this.dir, file));
+                this.close();
+            });
+        }
+    }
+
+    onClose(): void {
+        const { contentEl } = this;
+        contentEl.empty();
     }
 }

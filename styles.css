@@ -33,6 +33,47 @@ If your plugin does not need CSS, delete this file.
     user-select: text;
 }
 
+/* ── 底部工具栏 ────────────────────── */
+.pi-chat-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 4px 8px;
+    flex-shrink: 0;
+}
+
+.pi-chat-history-btn {
+    background: none;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.pi-chat-history-btn:hover {
+    background: var(--background-modifier-hover);
+}
+
+/* ── 历史会话弹窗 ──────────────────── */
+.pi-history-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.pi-history-item {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    cursor: pointer;
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+}
+
+.pi-history-item:hover {
+    background: var(--background-modifier-hover);
+}
+
 /* 输入框，贴在底部 */
 .pi-chat-input {
     width: 100%;
