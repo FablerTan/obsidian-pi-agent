@@ -238,8 +238,7 @@ If your plugin does not need CSS, delete this file.
     border-radius: 8px;
     margin-bottom: 8px;
     max-width: 85%;
-    min-width: 200px;
-    width: fit-content;
+    width: auto;            /* 占满可用宽度，随面板拉伸 */
     word-break: break-word;
     user-select: text;
 }
