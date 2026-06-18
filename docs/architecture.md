@@ -109,7 +109,9 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `loadCommands()` | 从 pi 加载可用命令列表（`get_commands`），传给 CommandMenu |
 | `handleNewSession()` | 发送 `new_session` RPC，清空消息列表 + 输入框 + 加载状态 |
 
-| `handleReload()` | 重启 pi 子进程（让新增 skill/extension 生效） |
+| `handleReload()` | 重启 pi 子进程，对比命令列表变化，显示分组详情（新增绿色、移除红色+删除线） |
+| `renderReloadGroup(el, label, items, newNames, removedNames)` | 渲染 reload 消息中的一个分组（扩展/技能/模板等），逐项标记新增或移除 |
+| `renderReloadFromCache(el, cmds)` | `get_commands` 失败时用缓存数据回退渲染具体列表 |
 | `handleHistory()` | 打开历史会话浮层（`/history` 命令触发） |
 | `abort()` | 发送 `abort` RPC，重置 UI 状态，清除超时定时器 |
 | `extractTextFromContent(content)` | 从 content 数组中提取纯文本 |
@@ -130,6 +132,8 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `currentNoteName` | `string \| null` | 当前活动笔记的文件名 |
 | `noteAttached` | `boolean` | 是否将笔记路径附加到消息中 |
 | `selectedText` | `string` | 当前编辑器中选中的文本（失焦时保留） |
+| `previousCmdNames` | `Set<string>` | 上一次加载的命令名集合，用于 `/reload` 对比新增/移除 |
+| `previousCmdList` | `{ name, source }[]` | 上一次加载的完整命令数据，`get_commands` 失败时回退显示 |
 
 **UI 结构**：
 ```
@@ -164,7 +168,7 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | 命令 | 处理 |
 |------|------|
 | `/new` | 调用 `handleNewSession()`，清空会话 + 输入框 + 加载状态 |
-| `/reload` | 调用 `handleReload()`，重启 pi 子进程，重新加载 skill/extension |
+| `/reload` | 调用 `handleReload()`，重启 pi 子进程，重新加载 skill/extension，并在消息中按 source 分组显示所有命令（新增绿色+NEW、移除红色+删除线+REMOVED） |
 | `/history` | 调用 `handleHistory()`，打开历史会话浮层 |
 | 其他 | 填入 `/命令名 ` 到输入框继续编辑 |
 

@@ -57,6 +57,9 @@ export class PiChatView extends ItemView {
     // 上一次加载的命令名集合（用于 /reload 对比新增/移除）
     private previousCmdNames: Set<string> = new Set();
 
+    // 上一次加载的完整命令数据（含 source），用于 /reload 失败时回退显示
+    private previousCmdList: { name: string; source: string }[] = [];
+
     // RPC 客户端
     private piClient: PiRpcClient;
 
@@ -441,62 +444,140 @@ export class PiChatView extends ItemView {
                     { name: 'history', description: '历史会话', source: 'extension' as const },
                     ...cmds,
                 ]);
-                // 分组统计
-                const groups = new Map<string, string[]>();
+                // 按 source 分组（每个命令保留 name + source）
+                const groups = new Map<string, { name: string; source: string }[]>();
                 for (const c of cmds) {
                     const src = c.source || 'other';
                     if (!groups.has(src)) groups.set(src, []);
-                    groups.get(src)!.push(c.name);
+                    groups.get(src)!.push({ name: c.name, source: src });
                 }
-                // 构建通知消息（DOM API，图标用 setIcon）
+                // 新命令名集合（不含 builtins）
+                const newNames = new Set(cmds.map((c: any) => c.name));
+                // 找出被移除的命令（在 previousCmdNames 中但不在新集合中）
+                const removedNames = new Set<string>();
+                for (const old of this.previousCmdNames) {
+                    if (!newNames.has(old) && old !== 'new' && old !== 'reload' && old !== 'history') {
+                        removedNames.add(old);
+                    }
+                }
+                // source 标签映射
+                const labels: Record<string, string> = {
+                    extension: '扩展',
+                    skill: '技能',
+                    prompt: '模板',
+                    model: '模型',
+                    tool: '工具',
+                    other: '其他',
+                };
+                // 显示顺序
+                const order = ['extension', 'skill', 'prompt', 'tool', 'model'];
+                // 构建通知消息
                 this.addSystemMessage('refresh-cw', 'Pi 已重载', (el) => {
-                    const order = ['extension', 'skill', 'prompt'];
-                    const labels: Record<string, string> = { extension: '扩展', skill: '技能', prompt: '模板' };
+                    // 先按顺序显示已知类型
                     for (const key of order) {
                         const items = groups.get(key);
-                        if (items && items.length > 0) {
-                            const section = el.createDiv({ cls: 'pi-reload-section' });
-                            section.createSpan({ cls: 'pi-reload-label', text: labels[key] || key });
-                            section.createSpan({ cls: 'pi-reload-count', text: String(items.length) });
-                            const itemsWrap = el.createDiv({ cls: 'pi-reload-items' });
-                            for (const n of items) {
-                                const isNew = !this.previousCmdNames.has(n);
-                                const isRemoved = false; // 在同组内无法判断移除，后面整体比对
-                                const itemEl = itemsWrap.createSpan({ cls: 'pi-reload-item' });
-                                itemEl.setText(n);
-                                if (isNew) itemEl.addClass('pi-reload-item-new');
-                            }
-                        }
+                        if (!items || items.length === 0) continue;
+                        this.renderReloadGroup(el, labels[key] || key, items, newNames, removedNames);
                         groups.delete(key);
                     }
-                    // 检查被移除的命令
-                    const newNames = new Set(cmds.map((c: any) => c.name));
-                    const removed: string[] = [];
-                    for (const old of this.previousCmdNames) {
-                        if (!newNames.has(old) && old !== 'new' && old !== 'reload' && old !== 'history') {
-                            removed.push(old);
-                        }
+                    // 显示剩余未识别的 source 类型
+                    for (const [key, items] of groups.entries()) {
+                        if (items.length === 0) continue;
+                        this.renderReloadGroup(el, labels[key] || key, items, newNames, removedNames);
                     }
-                    if (removed.length > 0) {
-                        const section = el.createDiv({ cls: 'pi-reload-section' });
+                    // 如果有被移除的命令但上面未显示（理论上已移除的不属于任何现有组）
+                    if (removedNames.size > 0) {
+                        const section = el.createDiv({ cls: 'pi-reload-section pi-reload-section-removed' });
                         section.createSpan({ cls: 'pi-reload-label', text: '已移除' });
-                        section.createSpan({ cls: 'pi-reload-count', text: String(removed.length) });
+                        section.createSpan({ cls: 'pi-reload-count', text: String(removedNames.size) });
                         const itemsWrap = el.createDiv({ cls: 'pi-reload-items' });
-                        for (const n of removed) {
+                        for (const n of removedNames) {
                             const itemEl = itemsWrap.createSpan({ cls: 'pi-reload-item pi-reload-item-removed' });
                             itemEl.setText(n);
                         }
                     }
+                    // 如果没有任何变化，加一行小字提示
+                    if (removedNames.size === 0 && ![...newNames].some(n => !this.previousCmdNames.has(n))) {
+                        const note = el.createDiv({ cls: 'pi-reload-note' });
+                        note.setText('无变化');
+                    }
                 });
-                // 保存新命令名供下次对比
+                // 保存新命令名和完整数据供下次对比
                 this.previousCmdNames = new Set(cmds.map((c: any) => c.name));
+                this.previousCmdList = cmds.map((c: any) => ({ name: c.name, source: c.source || 'other' }));
             } else {
-                this.addSystemMessage('refresh-cw', 'Pi 已重载', () => {});
+                // get_commands 失败时，用缓存数据（如果有）显示具体内容
+                if (this.previousCmdList.length > 0) {
+                    this.addSystemMessage('refresh-cw', 'Pi 已重载（命令列表未更新）', (el) => {
+                        this.renderReloadFromCache(el, this.previousCmdList);
+                    });
+                } else {
+                    this.addSystemMessage('refresh-cw', 'Pi 已重载', (el) => {
+                        el.createDiv({ cls: 'pi-reload-note', text: '未能获取命令列表，请检查 pi 是否正常运行' });
+                    });
+                }
                 this.loadCommands();
                 this.previousCmdNames = new Set();
+                this.previousCmdList = [];
             }
         } catch {
             new Notice('重载失败');
+        }
+    }
+
+    // ── 用缓存数据渲染 reload 消息（get_commands 失败时回退） ──
+    private renderReloadFromCache(el: HTMLElement, cmds: { name: string; source: string }[]): void {
+        // 按 source 分组
+        const groups = new Map<string, { name: string; source: string }[]>();
+        for (const c of cmds) {
+            if (!groups.has(c.source)) groups.set(c.source, []);
+            groups.get(c.source)!.push(c);
+        }
+        const labels: Record<string, string> = {
+            extension: '扩展', skill: '技能', prompt: '模板',
+            model: '模型', tool: '工具', other: '其他',
+        };
+        const order = ['extension', 'skill', 'prompt', 'tool', 'model'];
+        for (const key of order) {
+            const items = groups.get(key);
+            if (!items || items.length === 0) continue;
+            this.renderReloadGroup(el, labels[key] || key, items, new Set(), new Set());
+            groups.delete(key);
+        }
+        for (const [key, items] of groups.entries()) {
+            if (items.length === 0) continue;
+            this.renderReloadGroup(el, labels[key] || key, items, new Set(), new Set());
+        }
+        // 脚注：提示这是缓存数据
+        const note = el.createDiv({ cls: 'pi-reload-note' });
+        note.setText('↑ 命令列表未刷新，显示上次加载的内容');
+    }
+
+    // ── 渲染 reload 分组 ──────────────────────
+    private renderReloadGroup(
+        el: HTMLElement,
+        label: string,
+        items: { name: string; source: string }[],
+        newNames: Set<string>,
+        removedNames: Set<string>,
+    ): void {
+        const section = el.createDiv({ cls: 'pi-reload-section' });
+        section.createSpan({ cls: 'pi-reload-label', text: label });
+        section.createSpan({ cls: 'pi-reload-count', text: String(items.length) });
+        const itemsWrap = el.createDiv({ cls: 'pi-reload-items' });
+        for (const item of items) {
+            const isNew = !this.previousCmdNames.has(item.name);
+            const isRemoved = removedNames.has(item.name);
+            const itemEl = itemsWrap.createSpan({ cls: 'pi-reload-item' });
+            itemEl.setText(item.name);
+            if (isNew) {
+                itemEl.addClass('pi-reload-item-new');
+                // 从移除集合中剔除（不可能同时新增又移除，但防御性处理）
+                removedNames.delete(item.name);
+            }
+            if (isRemoved) {
+                itemEl.addClass('pi-reload-item-removed');
+            }
         }
     }
 

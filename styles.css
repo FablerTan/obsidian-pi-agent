@@ -464,8 +464,34 @@ If your plugin does not need CSS, delete this file.
 
 .pi-reload-item-removed {
     text-decoration: line-through;
+    color: var(--color-red) !important;
+    opacity: 0.85;
+}
+
+.pi-reload-item-removed::after {
+    content: 'REMOVED';
+    font-size: 8px;
+    font-weight: var(--font-semibold);
+    color: var(--color-red);
+    margin-left: 3px;
+    vertical-align: super;
+}
+
+/* ── 已移除分组标题（红色调） ── */
+.pi-reload-section-removed .pi-reload-label {
+    color: var(--color-red);
+}
+
+.pi-reload-section-removed .pi-reload-count {
+    color: var(--color-red);
+}
+
+/* ── 无变化提示 ── */
+.pi-reload-note {
     color: var(--text-faint);
-    opacity: 0.7;
+    font-size: 11px;
+    font-style: italic;
+    padding: 4px 0;
 }
 
 
