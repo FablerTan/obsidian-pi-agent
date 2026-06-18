@@ -19,7 +19,8 @@ export class PiRpcClient {
         // pi 的完整路径（macOS Homebrew 安装路径）
         const piPath = '/opt/homebrew/bin/pi';
 
-        this.proc = spawn(piPath, ['--mode', 'rpc', '--no-session'], {
+        // 不加 --no-session，让 pi 自动保存会话文件到 ~/.pi/agent/sessions/
+        this.proc = spawn(piPath, ['--mode', 'rpc'], {
             cwd,
             stdio: ['pipe', 'pipe', 'pipe'],
         });
