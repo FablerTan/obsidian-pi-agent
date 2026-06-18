@@ -211,8 +211,32 @@ export class PiChatView extends ItemView {
         // 按文件名倒序（最新的在前面）
         files.sort().reverse();
 
-        // 弹出一个选择界面
-        const modal = new HistoryModal(this.app, files, fullDir, async (sessionPath) => {
+        // 读取每个会话的名字（从文件第一行 header 中提取）
+        const sessions: Array<{ file: string; displayName: string }> = [];
+        for (const f of files) {
+            const filePath = path.join(fullDir, f);
+            let displayName = f; // 默认用文件名
+            try {
+                const headerLine = fs.readFileSync(filePath, 'utf-8').split('\n')[0] || '';
+                const header = JSON.parse(headerLine);
+                if (header.name) {
+                    displayName = header.name;
+                } else {
+                    // 没有名字就格式化时间戳
+                    const dateStr = f.split('_')[0] || f;
+                    displayName = dateStr.replace(/T/, ' ').replace(/-\d+Z$/, '');
+                }
+            } catch {
+                // 解析失败就用文件名
+            }
+            sessions.push({ file: f, displayName });
+        }
+
+        // sessions 里的 file 只存了文件名，传给 modal 时拼接完整路径
+        const modal = new HistoryModal(this.app, sessions.map(s => ({
+            ...s,
+            file: path.join(fullDir, s.file),
+        })), async (sessionPath) => {
             // 用户选了一个会话，切换到它
             const switchResp = await this.piClient.sendAndWait({
                 type: 'switch_session',
@@ -296,8 +320,7 @@ export class PiChatView extends ItemView {
 class HistoryModal extends Modal {
     constructor(
         app: any,
-        private files: string[],
-        private dir: string,
+        private sessions: Array<{ file: string; displayName: string }>,
         private onSelect: (sessionPath: string) => void,
     ) {
         super(app);
@@ -308,25 +331,18 @@ class HistoryModal extends Modal {
         contentEl.empty();
         contentEl.createEl('h2', { text: '历史会话' });
 
-        if (this.files.length === 0) {
+        if (this.sessions.length === 0) {
             contentEl.createEl('p', { text: '没有历史会话' });
             return;
         }
 
         const list = contentEl.createEl('ul', { cls: 'pi-history-list' });
 
-        for (const file of this.files) {
-            // 文件名: 2026-06-14T15-24-55-995Z_xxx.jsonl
-            // 取下划线前的时间部分，把 T 替换为空格，去掉毫秒和 Z
-            const dateStr = file.split('_')[0] || file;
-            const displayTime = (dateStr || '')
-                .replace(/T/, ' ')
-                .replace(/-\d+Z$/, '');
-
+        for (const s of this.sessions) {
             const item = list.createEl('li', { cls: 'pi-history-item' });
-            item.setText(displayTime);
+            item.setText(s.displayName);
             item.addEventListener('click', () => {
-                this.onSelect(path.join(this.dir, file));
+                this.onSelect(s.file);
                 this.close();
             });
         }
