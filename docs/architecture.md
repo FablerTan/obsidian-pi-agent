@@ -9,11 +9,13 @@ src/
   pi/
     rpc-client.ts       pi RPC 通信客户端
   ui/
-    PiChatView.ts       聊天面板视图（核心 UI + 消息流）
+    PiChatView.ts       聊天面板核心（消息流、加载动画、命令菜单、生命周期）
     MarkdownMsg.ts      流式 Markdown 渲染（代码块增强）
     ToolCallMsg.ts      工具调用卡片（显示工具执行状态和结果）
     CommandMenu.ts      命令菜单（输入 / 时弹出命令列表）
     HistoryPanel.ts     历史会话管理器（读取、浮层、切换）
+    NoteBar.ts          笔记栏（笔记名 + 选中文本追踪，位于输入框上方）
+    WelcomePage.ts      欢迎页（首次对话前显示上下文和命令列表）
   utils/
     helpers.ts          工具函数（文本提取等）
 
@@ -176,21 +178,61 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | 编辑器中有选中文本 | `[选中文本 (N 字)]\n\n选中内容` |
 | 两者都有 | 按顺序拼接，用 `\n\n` 分隔，最后跟用户消息 |
 
-**笔记栏交互**：
-- 点击左侧笔记名区域（`.pi-chat-note-left`）切换 `noteAttached` 状态
-- 关闭状态：`pin-off` 图标 + 灰色文字
-- 开启状态：`pin` 图标 + 主题色 + 左边框 + 浅色背景底纹
-- 未选中编辑器笔记时，显示斜体「无活动笔记」
-- 笔记名最大宽度 180px，超出用 `text-overflow: ellipsis` 截断
-
-**选中文本追踪**：
-- 监听 `editor-change`（内容变化）和 `file-open`（切换笔记）事件触发刷新
-- `textarea` 的 `mousedown` 事件在焦点转移前抓取一次选区
-- 编辑器失焦时空选区**不覆盖**上次选中文本，只有编辑器不存在（文件关闭）时才清空
+**上下文组装**：通过 `noteBar.getContextParts()` 获取格式化上下文片段数组，`PiChatView` 在 Enter 发送时拼接到消息前。
 
 ---
 
-### 4. `src/ui/HistoryPanel.ts` — 历史会话管理器
+### 4. `src/ui/NoteBar.ts` — 笔记栏（笔记名 + 选中文本）
+
+**职责**：位于输入框上方，左侧显示当前笔记名（点击切换是否发送笔记路径），右侧显示编辑器中选中文本的行数和字数。
+
+**API**：
+| 方法/属性 | 说明 |
+|-----------|------|
+| `isAttached` | 是否将笔记路径作为上下文发送 |
+| `notePath` | 当前笔记路径 |
+| `getContextParts()` | 返回格式化的上下文片段数组 `[\"[当前笔记: path]\", \"[选中文本 (N 字)]\\n\\n...\"]` |
+| `destroy()` | 清理事件监听 |
+
+**事件绑定**：
+- `file-open` → 切换笔记时刷新显示，切换文件时清空选中文本
+- `editor-change` → 编辑器内容变化时刷新选中文本，无选中则清空
+- `containerEl.mouseup` → 检测点击是否在编辑器内部，在编辑器内无选中则清空，编辑器外保留
+- `textarea.mousedown` → 焦点转移前抓取一次选区
+
+**UI 结构**：
+```
+.pi-chat-note-bar (flex, space-between)
+  ├── .pi-chat-note-left (pin图标 + 笔记名，点击切换)
+  │     ├── pi-chat-note-icon (pin-off / pin)
+  │     └── pi-chat-note-name (max-width 180px, 截断)
+  └── .pi-chat-selection-info (「选中 N 行 M 字」)
+```
+
+**选中文本保活策略**：
+- 只有编辑器中有**新的非空选中**时才更新
+- 编辑器失焦（点击 Pi 面板等）不覆盖，保留上次选中供发送
+- 编辑器内部点击无选中 → 清空（用户移动了光标）
+- 切换/关闭文件 → 清空
+
+---
+
+### 5. `src/ui/WelcomePage.ts` — 欢迎页
+
+**职责**：首次对话前显示 Pi Chat 标题、上下文文件列表、可用命令列表（按 source 分组）。
+
+| 方法 | 说明 |
+|------|------|
+| `loadData()` | 异步加载上下文文件和命令列表并渲染 |
+| `remove()` | 移除欢迎页 DOM |
+
+**数据来源**：
+- 上下文文件：从 vault 路径下的 `.pi/agent/` 目录读取 `.md`/`.txt` 文件
+- 命令列表：通过 `piClient.sendAndWait({ type: \"get_commands\" })` 获取
+
+---
+
+### 6. `src/ui/HistoryPanel.ts` — 历史会话管理器
 
 **职责**：读取 pi 会话文件、显示 iOS 风格底部浮层、切换会话。
 
@@ -210,13 +252,13 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 
 ---
 
-### 5. `src/ui/MarkdownMsg.ts` — 流式 Markdown 渲染
+### 7. `src/ui/MarkdownMsg.ts` — 流式 Markdown 渲染
 
 **见 MarkdownMsg.ts 顶部注释**，渲染 AI 回复并增强代码块（语言标签 + 复制按钮）。
 
 ---
 
-### 6. `src/ui/ToolCallMsg.ts` — 工具调用卡片
+### 8. `src/ui/ToolCallMsg.ts` — 工具调用卡片
 
 **职责**：以卡片形式展示 Pi 调用的工具（bash、read、edit 等），包括名称、参数、执行状态和输出结果。
 
@@ -261,7 +303,7 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 
 ---
 
-### 7. `src/ui/CommandMenu.ts` — 命令菜单
+### 9. `src/ui/CommandMenu.ts` — 命令菜单
 
 **职责**：输入框输入 `/` 时弹出命令建议列表，支持键盘导航和鼠标点击。
 
@@ -292,7 +334,7 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 
 ---
 
-### 8. `src/utils/helpers.ts` — 工具函数
+### 10. `src/utils/helpers.ts` — 工具函数
 
 | 函数 | 说明 |
 |------|------|
@@ -300,7 +342,7 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 
 ---
 
-### 9. `src/settings.ts` — 配置管理
+### 11. `src/settings.ts` — 配置管理
 
 **职责**：定义设置接口、默认值和设置页面 UI。
 
