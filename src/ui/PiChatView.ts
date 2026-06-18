@@ -9,6 +9,7 @@ import { CommandMenu } from './CommandMenu';
 import { InputStatusBar } from './InputStatusBar';
 import { NoteBar } from './NoteBar';
 import { WelcomePage } from './WelcomePage';
+import { ThinkingBlock } from './ThinkingBlock';
 
 // 视图的唯一标识符，用来注册和查找这个视图
 export const PI_CHAT_VIEW_TYPE = 'pi-chat-view';
@@ -28,6 +29,9 @@ export class PiChatView extends ItemView {
 
     // 当前助手消息的容器 DOM 元素（文字 + 工具卡片都在这个容器里）
     private currentAssistantEl: HTMLElement | null = null;
+
+    // 当前思考块（AI 推理过程）
+    private thinkingBlock: ThinkingBlock | null = null;
 
     // 追踪正在执行的工具调用（toolCallId -> ToolCallMsg）
     private toolCalls: Map<string, ToolCallMsg> = new Map();
@@ -139,7 +143,7 @@ export class PiChatView extends ItemView {
                 const handled = this.commandMenu.handleKeydown(e);
                 if (handled) return;
             }
-            if (e.key === 'Escape' && (this.loadingEl || this.currentMarkdown || this.toolCalls.size > 0)) {
+            if (e.key === 'Escape' && (this.loadingEl || this.currentMarkdown || this.thinkingBlock || this.toolCalls.size > 0)) {
                 e.preventDefault();
                 this.abort();
                 return;
@@ -245,6 +249,22 @@ export class PiChatView extends ItemView {
                 if (delta.type === 'toolcall_start' && this.loadingEl) {
                     this.hideLoading();
                 }
+                // ── 思考链内容 ──
+                if (delta.type === 'thinking_start') {
+                    this.hideLoading();
+                    this.currentMarkdown = null;  // 后续文字另起 textEl
+                    this.currentAssistantEl = this.getOrCreateAssistantEl();
+                    this.thinkingBlock = new ThinkingBlock(this.currentAssistantEl);
+                }
+                if (delta.type === 'thinking_delta' && this.thinkingBlock) {
+                    this.thinkingBlock.append(delta.delta);
+                    this.thinkingBlock.expand();
+                    this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+                }
+                if (delta.type === 'thinking_end' && this.thinkingBlock) {
+                    this.thinkingBlock.finish();
+                    this.thinkingBlock = null;
+                }
                 break;
             }
             case 'tool_execution_start': {
@@ -278,6 +298,7 @@ export class PiChatView extends ItemView {
             case 'agent_end': {
                 this.currentMarkdown = null;
                 this.currentAssistantEl = null;
+                this.thinkingBlock = null;
                 this.toolCalls.clear();
                 break;
             }
@@ -286,6 +307,7 @@ export class PiChatView extends ItemView {
                 this.hideLoading();
                 this.currentMarkdown = null;
                 this.currentAssistantEl = null;
+                this.thinkingBlock = null;
                 this.toolCalls.clear();
                 new Notice('Pi 返回了错误');
                 break;
@@ -335,6 +357,7 @@ export class PiChatView extends ItemView {
                 this.messagesEl.empty();
                 this.currentMarkdown = null;
                 this.currentAssistantEl = null;
+                this.thinkingBlock = null;
                 this.toolCalls.clear();
                 this.welcomePage = new WelcomePage(this.messagesEl, this.app, this.piClient);
                 this.welcomePage.loadData();
@@ -355,6 +378,7 @@ export class PiChatView extends ItemView {
         this.hideLoading();
         this.currentMarkdown = null;
         this.currentAssistantEl = null;
+        this.thinkingBlock = null;
         this.toolCalls.clear();
         new Notice('已打断');
     }

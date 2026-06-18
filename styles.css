@@ -663,6 +663,86 @@ If your plugin does not need CSS, delete this file.
 }
 
 
+/* ── 思考链卡片 ──────────────────── */
+.pi-thinking-block {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-primary);
+    overflow: hidden;
+    font-size: var(--font-ui-small);
+    margin-top: 8px;
+}
+
+.pi-thinking-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    color: var(--text-muted);
+}
+
+.pi-thinking-header:hover {
+    background: var(--background-modifier-hover);
+}
+
+.pi-thinking-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-accent);
+}
+
+.pi-thinking-title {
+    flex: 1;
+    font-weight: var(--font-semibold);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pi-thinking-toggle {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-faint);
+    transition: transform 0.2s;
+}
+
+.pi-thinking-body {
+    border-top: 1px solid var(--background-modifier-border);
+    padding: 8px 10px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.pi-thinking-body.pi-thinking-collapsed {
+    display: none;
+}
+
+.pi-thinking-content {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: var(--font-monospace);
+    line-height: 1.5;
+}
+
+/* 思考完成时去掉图标动画 */
+.pi-thinking-done .pi-thinking-icon {
+    color: var(--text-faint);
+}
+
+
 /* ── 工具调用卡片 ──────────────────── */
 /* 工具卡片在助手气泡内部时，与文字之间留间距 */
 .pi-chat-msg-assistant > .pi-chat-tool-wrapper {
