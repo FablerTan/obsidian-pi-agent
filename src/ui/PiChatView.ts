@@ -7,6 +7,7 @@ import { HistoryPanel } from './HistoryPanel';
 import { MarkdownMsg } from './MarkdownMsg';
 import { ToolCallMsg } from './ToolCallMsg';
 import { CommandMenu } from './CommandMenu';
+import { InputStatusBar } from './InputStatusBar';
 
 // 视图的唯一标识符，用来注册和查找这个视图
 export const PI_CHAT_VIEW_TYPE = 'pi-chat-view';
@@ -35,6 +36,9 @@ export class PiChatView extends ItemView {
 
     // 命令菜单（输入 / 时弹出）
     private commandMenu!: CommandMenu;
+
+    // 底部状态栏（模型 + 思考层级）
+    private inputStatusBar!: InputStatusBar;
 
     // RPC 客户端
     private piClient: PiRpcClient;
@@ -140,6 +144,9 @@ export class PiChatView extends ItemView {
                 }, 5000);
             }
         });
+
+        // ── 底部状态栏（模型 + 思考层级） ──
+        this.inputStatusBar = new InputStatusBar(container, this.piClient);
 
         this.messagesEl = messagesEl;
 

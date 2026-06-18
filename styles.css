@@ -425,6 +425,48 @@ If your plugin does not need CSS, delete this file.
 }
 
 
+/* ── 输入框底部状态栏（模型 + 思考层级） ── */
+.pi-input-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    flex-shrink: 0;
+    font-size: 11px;
+    color: var(--text-faint);
+    border-top: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+}
+
+.pi-status-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+
+.pi-status-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-muted);
+}
+
+.pi-status-icon {
+    width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pi-status-sep {
+    color: var(--background-modifier-border);
+    margin: 0 2px;
+}
+
+
 /* ── 工具调用卡片 ──────────────────── */
 /* 工具卡片在助手气泡内部时，与文字之间留间距 */
 .pi-chat-msg-assistant > .pi-chat-tool-wrapper {
