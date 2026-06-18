@@ -4,6 +4,7 @@
 import { ItemView, WorkspaceLeaf, Notice, setIcon } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 import { HistoryPanel } from './HistoryPanel';
+import { MarkdownMsg } from './MarkdownMsg';
 
 // 视图的唯一标识符，用来注册和查找这个视图
 export const PI_CHAT_VIEW_TYPE = 'pi-chat-view';
@@ -17,6 +18,9 @@ export class PiChatView extends ItemView {
 
     // 加载动画元素（发送消息后、收到回复前显示）
     private loadingEl: HTMLDivElement | null = null;
+
+    // 当前正在流式输出的 markdown 消息（没有时为空）
+    private currentMarkdown: MarkdownMsg | null = null;
 
     // 历史会话管理器
     private historyPanel!: HistoryPanel;
@@ -119,17 +123,18 @@ export class PiChatView extends ItemView {
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     }
 
-    // ── 追加助手回复 ──────────────────────────
+    // ── 追加助手回复（Markdown 渲染） ──────────
     appendAssistantText(text: string): void {
         this.hideLoading();
 
-        let lastMsg = this.messagesEl.querySelector(
-            '.pi-chat-msg-assistant:last-child',
-        ) as HTMLDivElement | null;
-        if (!lastMsg) {
-            lastMsg = this.messagesEl.createDiv({ cls: 'pi-chat-msg-assistant' });
+        // 如果没有正在流出的 MarkdownMsg，创建一个新的
+        if (!this.currentMarkdown) {
+            const msgEl = this.messagesEl.createDiv({ cls: 'pi-chat-msg-assistant' });
+            this.currentMarkdown = new MarkdownMsg(this.app, msgEl, this);
         }
-        lastMsg.setText((lastMsg.textContent || '') + text);
+
+        // 追加文字并渲染
+        this.currentMarkdown.append(text);
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     }
 
@@ -161,12 +166,14 @@ export class PiChatView extends ItemView {
                 break;
             }
             case 'agent_end': {
-                console.log('pi 回复完成');
+                // 回复完成，重置 markdown 消息（下一条新消息重新创建）
+                this.currentMarkdown = null;
                 break;
             }
             case 'extension_error':
             case 'error': {
                 this.hideLoading();
+                this.currentMarkdown = null;
                 new Notice('Pi 返回了错误');
                 break;
             }
