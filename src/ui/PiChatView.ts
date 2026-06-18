@@ -60,6 +60,9 @@ export class PiChatView extends ItemView {
     // 上一次加载的完整命令数据（含 source），用于 /reload 失败时回退显示
     private previousCmdList: { name: string; source: string }[] = [];
 
+    // reload 进行中标志，防止重复触发
+    private isReloading = false;
+
     // RPC 客户端
     private piClient: PiRpcClient;
 
@@ -431,6 +434,12 @@ export class PiChatView extends ItemView {
 
     // ── 处理 /reload ──────────────────────────
     private async handleReload(): Promise<void> {
+        // ── 互斥锁：reload 进行中时禁止重复触发 ──
+        if (this.isReloading) {
+            new Notice('Pi 正在重载中，请稍候…');
+            return;
+        }
+        this.isReloading = true;
         this.commandMenu.hide();
         this.textarea.value = '';
         try {
@@ -458,6 +467,8 @@ export class PiChatView extends ItemView {
             this.handleReloadFallback(oldCmdList, oldNames);
         } catch {
             new Notice('重载失败');
+        } finally {
+            this.isReloading = false;
         }
     }
 
