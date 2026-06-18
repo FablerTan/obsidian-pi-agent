@@ -11,6 +11,7 @@ import {
 	MyPluginSettings,
 	SampleSettingTab,
 } from './settings';
+import { PiChatView, PI_CHAT_VIEW_TYPE } from './ui/PiChatView';
 
 // Remember to rename these classes and interfaces!
 
@@ -20,10 +21,12 @@ export default class MyPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (_evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		// 注册聊天面板视图
+		this.registerView(PI_CHAT_VIEW_TYPE, (leaf) => new PiChatView(leaf));
+
+		// 在左侧栏添加图标，点击打开聊天面板
+		this.addRibbonIcon('message-square', 'Open Pi Chat', () => {
+			this.activatePiChatView();
 		});
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
@@ -86,7 +89,32 @@ export default class MyPlugin extends Plugin {
 		);
 	}
 
-	onunload() {}
+	onunload() {
+		// 关闭所有打开的聊天面板
+		this.app.workspace.detachLeavesOfType(PI_CHAT_VIEW_TYPE);
+	}
+
+	// 打开聊天面板（如果已打开就切换到它）
+	activatePiChatView(): void {
+		const { workspace } = this.app;
+
+		// 查找是否已经有打开的面板
+		let leaf = workspace.getLeavesOfType(PI_CHAT_VIEW_TYPE).first();
+
+		if (!leaf) {
+			// 没有就创建一个新的，放在右侧栏
+			const rightLeaf = workspace.getRightLeaf(false);
+			if (rightLeaf) {
+				rightLeaf.setViewState({ type: PI_CHAT_VIEW_TYPE });
+			}
+			leaf = rightLeaf ?? undefined;
+		}
+
+		// 把焦点切换到该面板
+		if (leaf) {
+			workspace.revealLeaf(leaf);
+		}
+	}
 
 	async loadSettings() {
 		this.settings = Object.assign(
