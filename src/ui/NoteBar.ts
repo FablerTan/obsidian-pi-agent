@@ -39,6 +39,8 @@ export class NoteBar {
 
         // ── 事件绑定 ──
         this.setupEvents();
+        // 初始加载当前笔记（插件加载时文件已打开，不会触发 file-open）
+        this.onFileOpen();
     }
 
     // ── getter ──────────────────────────────────
