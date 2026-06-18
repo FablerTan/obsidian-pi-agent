@@ -11,6 +11,9 @@ export class PiChatView extends ItemView {
     // 消息列表容器
     messagesEl!: HTMLDivElement;
 
+    // 欢迎文字元素（首次对话前显示，发消息后移除）
+    private welcomeEl!: HTMLParagraphElement;
+
     // 加载动画元素（发送消息后、收到回复前显示）
     private loadingEl: HTMLDivElement | null = null;
 
@@ -56,7 +59,7 @@ export class PiChatView extends ItemView {
 
         // ── 消息列表区域（可滚动） ────────────
         const messagesEl = container.createDiv({ cls: 'pi-chat-messages' });
-        messagesEl.createEl('p', {
+        this.welcomeEl = messagesEl.createEl('p', {
             text: '开始和 Pi 对话吧！',
             cls: 'pi-chat-welcome',
         });
@@ -97,6 +100,12 @@ export class PiChatView extends ItemView {
 
     // ── 在消息列表里添加一条用户消息 ──────────
     addUserMessage(text: string): void {
+        // 有欢迎文字就移除（首次发消息时）
+        if (this.welcomeEl) {
+            this.welcomeEl.remove();
+            this.welcomeEl = null as any;
+        }
+
         const msgEl = this.messagesEl.createDiv({ cls: 'pi-chat-msg-user' });
         msgEl.setText(text);
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
