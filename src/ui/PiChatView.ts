@@ -265,6 +265,14 @@ export class PiChatView extends ItemView {
                     this.thinkingBlock.finish();
                     this.thinkingBlock = null;
                 }
+                // 文本块开始（确保 text 容器已初始化）
+                if (delta.type === 'text_start') {
+                    if (!this.currentMarkdown) {
+                        this.currentAssistantEl = this.getOrCreateAssistantEl();
+                        const textEl = this.currentAssistantEl.createDiv({ cls: 'pi-chat-msg-assistant-text' });
+                        this.currentMarkdown = new MarkdownMsg(this.app, textEl, this);
+                    }
+                }
                 break;
             }
             case 'tool_execution_start': {
