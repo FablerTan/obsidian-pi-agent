@@ -406,12 +406,15 @@ export class PiChatView extends ItemView {
             this.welcomePage.remove();
             this.welcomePage = null as any;
         }
-        const msgEl = this.messagesEl.createDiv({ cls: 'pi-chat-msg-system' });
+        const msgEl = this.messagesEl.createDiv({ cls: 'pi-msg-system' });
+        // 头部（和思考块头部样式一致）
         const header = msgEl.createDiv({ cls: 'pi-msg-system-header' });
         const iconEl = header.createSpan({ cls: 'pi-msg-system-icon' });
         setIcon(iconEl, icon);
         header.createSpan({ cls: 'pi-msg-system-title', text: title });
-        bodyFn(msgEl);
+        // 主体（和思考块主体样式一致）
+        const body = msgEl.createDiv({ cls: 'pi-msg-system-body' });
+        bodyFn(body);
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     }
 

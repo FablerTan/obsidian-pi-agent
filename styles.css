@@ -373,38 +373,43 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* ── 系统通知消息（/reload 等） ───────────── */
-.pi-chat-msg-system {
+.pi-msg-system {
     border: 1px solid var(--background-modifier-border);
     border-radius: 8px;
     background: var(--background-primary);
-    padding: 10px 12px;
-    margin-bottom: 8px;
+    overflow: hidden;
     font-size: var(--font-ui-small);
-    user-select: text;
-    width: auto;
-    word-break: break-word;
+    margin-bottom: 8px;
 }
 
 .pi-msg-system-header {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-bottom: 8px;
+    padding: 6px 10px;
+    color: var(--text-muted);
 }
 
 .pi-msg-system-icon {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--text-accent);
+    flex-shrink: 0;
 }
 
 .pi-msg-system-title {
     font-weight: var(--font-semibold);
-    color: var(--text-normal);
-    font-size: var(--font-ui-medium);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pi-msg-system-body {
+    border-top: 1px solid var(--background-modifier-border);
+    padding: 8px 10px;
 }
 
 .pi-reload-section {
