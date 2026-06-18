@@ -200,21 +200,35 @@ export class PiChatView extends ItemView {
         const existing = this.contentEl.querySelector('.pi-history-panel');
         if (existing) {
             existing.remove();
+            this.contentEl.querySelector('.pi-history-backdrop')?.remove();
             return;
         }
 
         // 读取会话列表
         const sessions = this.readSessions();
 
-        // ── 创建浮层 ──────────────────────────────
+        // ── 半透明背景（点击关闭） ────────────
+        const backdrop = this.contentEl.createDiv({ cls: 'pi-history-backdrop' });
+        backdrop.addEventListener('click', () => {
+            backdrop.remove();
+            panel.remove();
+        });
+
+        // ── 底部浮层 ──────────────────────────────
         const panel = this.contentEl.createDiv({ cls: 'pi-history-panel' });
+
+        // 顶部拖拽横条（iOS 风格）
+        panel.createDiv({ cls: 'pi-history-pill' });
 
         // 标题栏
         const titleBar = panel.createDiv({ cls: 'pi-history-titlebar' });
         titleBar.createSpan({ text: '历史会话' });
         const closeBtn = titleBar.createEl('span', { cls: 'pi-history-close' });
         setIcon(closeBtn, 'x');
-        closeBtn.addEventListener('click', () => panel.remove());
+        closeBtn.addEventListener('click', () => {
+            backdrop.remove();
+            panel.remove();
+        });
 
         if (sessions.length === 0) {
             panel.createEl('p', {
@@ -231,6 +245,7 @@ export class PiChatView extends ItemView {
             const item = list.createEl('li', { cls: 'pi-history-item' });
             item.setText(s.displayName);
             item.addEventListener('click', async () => {
+                backdrop.remove();
                 panel.remove();
                 await this.switchToSession(s.file);
             });

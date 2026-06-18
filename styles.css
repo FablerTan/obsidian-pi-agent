@@ -53,18 +53,41 @@ If your plugin does not need CSS, delete this file.
     color: var(--text-muted);
 }
 
-/* ── 历史会话浮层（面板内） ────────── */
-.pi-history-panel {
+/* ── 历史会话底部浮层（类似 iOS 风格） ── */
+.pi-history-backdrop {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: var(--background-primary);
+    background: rgba(0, 0, 0, 0.3);
     z-index: 10;
+}
+
+.pi-history-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 60%;
+    background: var(--background-primary);
+    z-index: 11;
     display: flex;
     flex-direction: column;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
     overflow-y: auto;
+}
+
+/* iOS 风格拖拽横条 */
+.pi-history-pill {
+    width: 36px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--background-modifier-border);
+    margin: 8px auto 4px;
+    flex-shrink: 0;
 }
 
 .pi-history-titlebar {
