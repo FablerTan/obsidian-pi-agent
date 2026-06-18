@@ -1,5 +1,5 @@
 // 历史会话底部浮层：读取、显示、切换历史会话
-import { Notice, setIcon, FileSystemAdapter, App } from 'obsidian';
+import { Notice, setIcon, FileSystemAdapter, App, MarkdownRenderer } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -161,7 +161,7 @@ export class HistoryPanel {
     }
 
     // ── 清空并加载消息 ──────────────────────────
-    private loadMessages(messages: any[]): void {
+    private async loadMessages(messages: any[]): Promise<void> {
         this.messagesEl.empty();
 
         // 重新显示欢迎文字
@@ -189,7 +189,8 @@ export class HistoryPanel {
                         welcomeEl.remove();
                     }
                     const el = this.messagesEl.createDiv({ cls: 'pi-chat-msg-assistant' });
-                    el.setText(text);
+                    // 用 Obsidian 的 MarkdownRenderer 渲染历史消息
+                    await MarkdownRenderer.render(this.app, text, el, '/', this.messagesEl as any);
                     hasContent = true;
                 }
             }
