@@ -33,21 +33,19 @@ If your plugin does not need CSS, delete this file.
     user-select: text;
 }
 
-/* ── 输入框容器（历史图标浮在右上角） ── */
-.pi-chat-input-wrapper {
-    position: relative;
+/* ── 历史图标（输入框上方靠右） ────── */
+.pi-chat-history-bar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 2px 4px 0 0;
     flex-shrink: 0;
 }
 
 .pi-chat-history-btn {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     color: var(--text-faint);
     cursor: pointer;
-    z-index: 1;
 }
 
 .pi-chat-history-btn:hover {

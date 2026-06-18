@@ -67,20 +67,20 @@ export class PiChatView extends ItemView {
             cls: 'pi-chat-welcome',
         });
 
-        // ── 底部输入框（历史图标浮在右上角） ────
-        const inputWrapper = container.createDiv({ cls: 'pi-chat-input-wrapper' });
-        const textarea = inputWrapper.createEl('textarea', {
-            cls: 'pi-chat-input',
-            placeholder: '输入消息... (Enter 发送, Shift+Enter 换行)',
-        });
-
-        // 历史图标浮在输入框右上角
-        const historyIcon = inputWrapper.createEl('span', {
+        // ── 底部输入框 ────────────────────────
+        // 历史图标放在输入框上方，靠右
+        const historyBar = container.createDiv({ cls: 'pi-chat-history-bar' });
+        const historyIcon = historyBar.createEl('span', {
             cls: 'pi-chat-history-btn',
         });
         setIcon(historyIcon, 'history');
         historyIcon.addEventListener('click', () => {
             this.openHistory();
+        });
+
+        const textarea = container.createEl('textarea', {
+            cls: 'pi-chat-input',
+            placeholder: '输入消息... (Enter 发送, Shift+Enter 换行)',
         });
 
         // Enter 发送消息给 pi，Shift+Enter 换行
