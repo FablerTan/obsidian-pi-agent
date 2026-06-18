@@ -145,6 +145,11 @@ export class PiChatView extends ItemView {
             }
         });
 
+        // 在焦点转移前抓取一次选区（点击输入框时编辑器还未失焦）
+        textarea.addEventListener('mousedown', () => {
+            this.captureSelectionBeforeFocusLost();
+        });
+
         // 输入变化时检测 / 命令
         textarea.addEventListener('input', () => {
             const val = textarea.value;
@@ -475,15 +480,37 @@ export class PiChatView extends ItemView {
         this.updateSelectedText();
     }
 
+    // ── 在焦点转移前抓取选区 ──────────────────
+    private captureSelectionBeforeFocusLost(): void {
+        const editor = this.app.workspace.activeEditor?.editor;
+        if (editor) {
+            const sel = editor.getSelection();
+            if (sel) {
+                this.selectedText = sel;
+                this.updateSelectionDisplay();
+            }
+        }
+    }
+
     // ── 刷新选中文本显示 ──────────────────────
     private updateSelectedText(): void {
         const editor = this.app.workspace.activeEditor?.editor;
         if (editor) {
             const sel = editor.getSelection();
-            this.selectedText = sel || '';
+            // 只有编辑器有实际选中内容时才更新，失焦导致的空选区不覆盖
+            if (sel) {
+                this.selectedText = sel;
+            }
+            // 如果编辑器存在但选区为空，保留上次选中（用户只是点到了别处）
         } else {
+            // 编辑器不在了（关闭了文件），才清空
             this.selectedText = '';
         }
+        this.updateSelectionDisplay();
+    }
+
+    // ── 更新选中文本 UI ───────────────────────
+    private updateSelectionDisplay(): void {
         if (this.selectedText) {
             const count = this.selectedText.length;
             this.selectionInfoEl.setText(`「选中 ${count} 字」`);
