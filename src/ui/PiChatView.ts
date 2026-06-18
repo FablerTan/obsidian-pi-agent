@@ -124,12 +124,18 @@ export class PiChatView extends ItemView {
             }
         });
 
-        // Enter 发送，Shift+Enter 换行
+        // Enter 发送，Shift+Enter 换行，Esc 打断
         textarea.addEventListener('keydown', (e) => {
             // 如果命令菜单开着，优先让菜单处理键盘事件
             if (this.commandMenu.isVisible()) {
                 const handled = this.commandMenu.handleKeydown(e);
                 if (handled) return;
+            }
+            // Esc 打断 AI 输出
+            if (e.key === 'Escape' && (this.loadingEl || this.currentMarkdown || this.toolCalls.size > 0)) {
+                e.preventDefault();
+                this.abort();
+                return;
             }
             if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
                 e.preventDefault();
@@ -335,6 +341,20 @@ export class PiChatView extends ItemView {
         } catch {
             new Notice('新建会话失败');
         }
+    }
+
+    // ── 打断 AI 输出 ──────────────────────────
+    private abort(): void {
+        // 关闭命令菜单（如果开着）
+        this.commandMenu.hide();
+        // 发送 abort RPC
+        this.piClient.send({ type: 'abort' });
+        // 重置 UI 状态
+        this.hideLoading();
+        this.currentMarkdown = null;
+        this.currentAssistantEl = null;
+        this.toolCalls.clear();
+        new Notice('已打断');
     }
 
     // ── 处理 /reload ──────────────────────────
