@@ -109,6 +109,12 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `handleHistory()` | 打开历史会话浮层（`/history` 命令触发） |
 | `abort()` | 发送 `abort` RPC，重置 UI 状态，清除超时定时器 |
 | `extractTextFromContent(content)` | 从 content 数组中提取纯文本 |
+| `toggleNoteAttach()` | 切换是否将当前笔记路径作为上下文发送 |
+| `updateNoteIcon()` | 更新笔记栏图标（pin-off / pin）+ 激活样式 |
+| `updateCurrentNote()` | 从 `workspace.getActiveFile()` 读取当前笔记名和路径 |
+| `updateSelectedText()` | 从 `activeEditor` 读取选中文本 |
+| `captureSelectionBeforeFocusLost()` | 在焦点转移前（mousedown）抓取一次选区 |
+| `updateSelectionDisplay()` | 更新选中字数 UI |
 
 **关键字段**：
 | 字段 | 类型 | 说明 |
@@ -116,6 +122,10 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `textarea` | `HTMLTextAreaElement` | 输入框引用，/new 等命令需要清空 |
 | `loadingTimeout` | `number \| null` | 5 秒超时保护定时器 ID，可精确清除 |
 | `currentAssistantEl` | `HTMLElement \| null` | 当前助手气泡容器（文字 + 工具卡片共享） |
+| `currentNotePath` | `string \| null` | 当前活动笔记的文件路径 |
+| `currentNoteName` | `string \| null` | 当前活动笔记的文件名 |
+| `noteAttached` | `boolean` | 是否将笔记路径附加到消息中 |
+| `selectedText` | `string` | 当前编辑器中选中的文本（失焦时保留） |
 
 **UI 结构**：
 ```
@@ -123,8 +133,11 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
   ├── .pi-chat-header (顶栏：pi 图标 + 标题)
   └── .pi-chat-container (flex: 1)
         ├── .pi-chat-messages (消息列表，可滚动)
-        └── .pi-chat-input-area (margin-top: auto, 贴底)
+        └── .pi-chat-input-area (贴底)
               ├── .pi-command-menu (/ 命令弹出列表)
+              ├── .pi-chat-note-bar (flex, space-between)
+              │     ├── .pi-chat-note-left (pin图标 + 笔记名，点击切换笔记附加)
+              │     └── .pi-chat-selection-info (选中字数「选中 N 字」)
               ├── .pi-chat-input (textarea 输入框)
               └── .pi-input-status-bar (模型 + 思考层级)
 ```
@@ -155,6 +168,25 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 1. **IME 兼容**：`keydown` 中检查 `e.isComposing`，IME 组词期间不拦截 Enter 键，避免组词内容回填
 2. **输出中禁发**：AI 正在输出（loadingEl / currentMarkdown / toolCalls 非空）时，Enter 静默忽略，需先 Esc 打断
 3. **超时保护**：发消息后 5 秒无回复，移除加载动画并提示；`/new` `/reload` `abort` 时主动清除定时器
+
+**上下文组装**（发送消息时，将额外信息拼接到 Prompt 前）：
+| 条件 | 拼接内容 |
+|------|----------|
+| 笔记附加开启 + `currentNotePath` 存在 | `[当前笔记: path/to/note.md]` |
+| 编辑器中有选中文本 | `[选中文本 (N 字)]\n\n选中内容` |
+| 两者都有 | 按顺序拼接，用 `\n\n` 分隔，最后跟用户消息 |
+
+**笔记栏交互**：
+- 点击左侧笔记名区域（`.pi-chat-note-left`）切换 `noteAttached` 状态
+- 关闭状态：`pin-off` 图标 + 灰色文字
+- 开启状态：`pin` 图标 + 主题色 + 左边框 + 浅色背景底纹
+- 未选中编辑器笔记时，显示斜体「无活动笔记」
+- 笔记名最大宽度 180px，超出用 `text-overflow: ellipsis` 截断
+
+**选中文本追踪**：
+- 监听 `editor-change`（内容变化）和 `file-open`（切换笔记）事件触发刷新
+- `textarea` 的 `mousedown` 事件在焦点转移前抓取一次选区
+- 编辑器失焦时空选区**不覆盖**上次选中文本，只有编辑器不存在（文件关闭）时才清空
 
 ---
 
