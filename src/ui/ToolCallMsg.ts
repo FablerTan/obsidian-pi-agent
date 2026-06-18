@@ -1,6 +1,6 @@
 // 工具调用卡片 —— 显示 Pi 调用的工具（bash、read、edit 等）
 // 包含工具名称、参数摘要、执行状态、输出结果
-// 可点击头部展开/收起参数详情和输出
+// 可点击头部切换三种状态：收起 → 限制5行 → 展开全部
 import { setIcon } from 'obsidian';
 
 // 工具名称到 Lucide 图标的映射
@@ -16,13 +16,24 @@ const TOOL_ICONS: Record<string, string> = {
     find: 'search',
 };
 
+type ViewState = 'collapsed' | 'limited' | 'expanded';
+
+// 状态 → 状态名（用于 aria-label / title）
+const STATE_LABEL: Record<ViewState, string> = {
+    collapsed: '展开',
+    limited: '显示全部',
+    expanded: '收起',
+};
+
 export class ToolCallMsg {
     private cardEl!: HTMLElement;
     private headerEl!: HTMLElement;
     private statusIcon!: HTMLElement;
     private bodyEl!: HTMLElement;
+    private outputEl!: HTMLElement;
+    private toggleIcon!: HTMLElement;
     private outputPre: HTMLElement | null = null;
-    private _isExpanded = false;
+    private state: ViewState = 'limited';  // 默认限制模式
 
     constructor(
         private container: HTMLElement,
@@ -36,7 +47,7 @@ export class ToolCallMsg {
     private render(): void {
         this.cardEl = this.container.createDiv({ cls: 'pi-chat-tool-call' });
 
-        // ── 头部（可点击展开/收起） ──
+        // ── 头部（可点击切换三种状态） ──
         this.headerEl = this.cardEl.createDiv({ cls: 'pi-chat-tool-header' });
 
         // 状态图标（旋转中/完成/错误）
@@ -57,11 +68,11 @@ export class ToolCallMsg {
             this.headerEl.createSpan({ cls: 'pi-chat-tool-args-summary', text: summary });
         }
 
-        // 展开/收起图标
-        const toggleIcon = this.headerEl.createSpan({ cls: 'pi-chat-tool-toggle' });
-        setIcon(toggleIcon, 'chevron-down');
+        // 状态切换图标
+        this.toggleIcon = this.headerEl.createSpan({ cls: 'pi-chat-tool-toggle' });
+        setIcon(this.toggleIcon, 'chevron-down');
 
-        // ── 主体（参数详情 + 输出，可折叠） ──
+        // ── 主体（参数详情 + 输出） ──
         this.bodyEl = this.cardEl.createDiv({ cls: 'pi-chat-tool-body' });
 
         // 参数详情
@@ -69,35 +80,32 @@ export class ToolCallMsg {
         const argsPre = argsDetail.createEl('pre');
         argsPre.setText(JSON.stringify(this.args, null, 2));
 
-        // 输出区域（运行时逐步填充，执行完成后显示结果）
-        this.bodyEl.createDiv({ cls: 'pi-chat-tool-output' });
+        // 输出区域
+        this.outputEl = this.bodyEl.createDiv({ cls: 'pi-chat-tool-output' });
 
-        // 点击头部切换展开/收起
+        // 点击头部切换状态
         this.headerEl.addEventListener('click', (e) => {
             e.stopPropagation();
-            this.toggleExpand();
+            this.cycleState();
         });
 
-        // 默认收起
-        this.collapse();
+        // 初始状态：限制模式
+        this.applyState();
     }
 
     // ── 格式化参数为一行摘要 ──────────────────
     private formatArgsSummary(): string {
         if (!this.args) return '';
 
-        // bash 命令直接显示命令内容
         if (this.toolName === 'bash' && this.args.command) {
             return `▸ ${this.args.command}`;
         }
-        // read/edit/write 显示路径
         if (this.args.path) {
             return `▸ ${this.args.path}`;
         }
         if (this.args.file) {
             return `▸ ${this.args.file}`;
         }
-        // 其他工具取第一个字符串参数
         const values = Object.values(this.args).filter(v => typeof v === 'string');
         if (values.length > 0) {
             const val = values[0] as string;
@@ -107,25 +115,55 @@ export class ToolCallMsg {
         return '';
     }
 
-    // ── 展开/收起 ──────────────────────────────
-    private toggleExpand(): void {
-        if (this._isExpanded) {
-            this.collapse();
-        } else {
-            this.expand();
+    // ── 循环切换状态：collapsed → limited → expanded → collapsed ──
+    private cycleState(): void {
+        const next: Record<ViewState, ViewState> = {
+            collapsed: 'limited',
+            limited: 'expanded',
+            expanded: 'collapsed',
+        };
+        this.state = next[this.state];
+        this.applyState();
+    }
+
+    // ── 应用当前状态到 UI ──────────────────────
+    private applyState(): void {
+        // 清除所有状态类
+        this.cardEl.removeClass('pi-tool-collapsed');
+        this.cardEl.removeClass('pi-tool-limited');
+        this.cardEl.removeClass('pi-tool-expanded');
+        this.bodyEl.removeClass('pi-tool-body-collapsed');
+        this.bodyEl.removeClass('pi-tool-body-limited');
+        this.bodyEl.removeClass('pi-tool-body-expanded');
+        this.outputEl.removeClass('pi-tool-output-limited');
+
+        // 更新图标（指向切换后的方向）
+        const iconMap: Record<ViewState, string> = {
+            collapsed: 'chevron-right',   // 点击后展开
+            limited: 'chevron-down',      // 点击后展开更多
+            expanded: 'chevron-up',       // 点击后收起
+        };
+        this.toggleIcon.empty();
+        setIcon(this.toggleIcon, iconMap[this.state]);
+
+        // 设置 title
+        this.headerEl.title = STATE_LABEL[this.state];
+
+        switch (this.state) {
+            case 'collapsed':
+                this.cardEl.addClass('pi-tool-collapsed');
+                this.bodyEl.addClass('pi-tool-body-collapsed');
+                break;
+            case 'limited':
+                this.cardEl.addClass('pi-tool-limited');
+                this.bodyEl.addClass('pi-tool-body-limited');
+                this.outputEl.addClass('pi-tool-output-limited');
+                break;
+            case 'expanded':
+                this.cardEl.addClass('pi-tool-expanded');
+                this.bodyEl.addClass('pi-tool-body-expanded');
+                break;
         }
-    }
-
-    private expand(): void {
-        this._isExpanded = true;
-        this.bodyEl.removeClass('pi-chat-tool-body-collapsed');
-        this.cardEl.removeClass('pi-chat-tool-collapsed');
-    }
-
-    private collapse(): void {
-        this._isExpanded = false;
-        this.bodyEl.addClass('pi-chat-tool-body-collapsed');
-        this.cardEl.addClass('pi-chat-tool-collapsed');
     }
 
     // ── 设置旋转状态（执行中） ────────────────
@@ -139,17 +177,15 @@ export class ToolCallMsg {
 
     // ── 设置输出内容（流式更新或最终结果） ────
     setOutput(text: string): void {
-        const outputEl = this.bodyEl.querySelector('.pi-chat-tool-output') as HTMLElement;
-        if (!outputEl) return;
-
         if (!this.outputPre) {
-            this.outputPre = outputEl.createEl('pre');
+            this.outputPre = this.outputEl.createEl('pre');
         }
         this.outputPre.setText(text);
 
-        // 有输出时自动展开
-        if (!this._isExpanded) {
-            this.expand();
+        // 有输出时至少切换到限制模式（如果当前是收起态）
+        if (this.state === 'collapsed') {
+            this.state = 'limited';
+            this.applyState();
         }
     }
 
@@ -166,7 +202,7 @@ export class ToolCallMsg {
             this.statusIcon.addClass('pi-chat-tool-success');
         }
 
-        // 提取结果文本并显示
+        // 显示结果
         if (result) {
             const text = this.extractResultText(result);
             if (text) {
@@ -177,16 +213,13 @@ export class ToolCallMsg {
 
     // ── 从 result 对象里提取纯文本 ────────────
     private extractResultText(result: any): string {
-        // result.content: [{ type: "text", text: "..." }]
         if (result.content && Array.isArray(result.content)) {
             return result.content
                 .filter((c: any) => c.type === 'text')
                 .map((c: any) => c.text || '')
                 .join('\n');
         }
-        // result 本身是字符串
         if (typeof result === 'string') return result;
-        // result.text
         if (result.text) return result.text;
         return '';
     }

@@ -695,24 +695,45 @@ If your plugin does not need CSS, delete this file.
     transition: transform 0.2s;
 }
 
-/* 收起时图标朝右 */
-.pi-chat-tool-collapsed .pi-chat-tool-toggle {
-    transform: rotate(-90deg);
+/* ── 三种状态 ── */
+
+/* 收起：只显示头部 */
+.pi-tool-collapsed .pi-chat-tool-body {
+    display: none;
+}
+
+/* 限制：显示主体，输出最多 5 行 */
+.pi-tool-limited .pi-chat-tool-body {
+    border-top: 1px solid var(--background-modifier-border);
+    max-height: none;
+    overflow: visible;
+}
+
+.pi-tool-output-limited pre {
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    max-height: none;
+}
+
+/* 展开：全量显示 */
+.pi-tool-expanded .pi-chat-tool-body {
+    border-top: 1px solid var(--background-modifier-border);
+    max-height: none;
+    overflow: visible;
+}
+
+.pi-tool-expanded .pi-chat-tool-output pre {
+    max-height: none;
+    overflow: visible;
 }
 
 /* ── 主体（参数详情 + 输出） ── */
 .pi-chat-tool-body {
-    border-top: 1px solid var(--background-modifier-border);
     max-height: 400px;
     overflow-y: auto;
     transition: max-height 0.2s, opacity 0.2s;
-}
-
-.pi-chat-tool-body-collapsed {
-    max-height: 0;
-    border-top: none;
-    overflow: hidden;
-    opacity: 0;
 }
 
 /* 参数详情 */
@@ -742,6 +763,4 @@ If your plugin does not need CSS, delete this file.
     font-size: 11px;
     color: var(--text-normal);
     background: var(--background-primary);
-    max-height: 300px;
-    overflow-y: auto;
 }
