@@ -242,21 +242,23 @@ If your plugin does not need CSS, delete this file.
     user-select: text;
 }
 
-/* markdown 渲染内容的内边距重置 */
+/* markdown 渲染内容的通用样式 */
 .pi-chat-msg-assistant p {
     margin: 0 0 6px 0;
 }
-
 .pi-chat-msg-assistant p:last-child {
     margin-bottom: 0;
 }
-
 .pi-chat-msg-assistant ul,
 .pi-chat-msg-assistant ol {
     margin: 4px 0;
     padding-left: 20px;
 }
+.pi-chat-msg-assistant li {
+    margin: 2px 0;
+}
 
+/* 行内代码 */
 .pi-chat-msg-assistant code {
     background: var(--background-primary);
     padding: 1px 4px;
@@ -264,15 +266,116 @@ If your plugin does not need CSS, delete this file.
     font-size: 0.9em;
 }
 
-.pi-chat-msg-assistant pre {
-    background: var(--background-primary);
-    padding: 8px;
-    border-radius: 6px;
-    overflow-x: auto;
+/* 代码块容器 */
+.pi-chat-code-wrapper {
     margin: 6px 0;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--background-modifier-border);
 }
 
-.pi-chat-msg-assistant pre code {
-    background: none;
+.pi-chat-msg-assistant pre {
+    margin: 0;
     padding: 0;
+    background: var(--background-primary);
+    overflow-x: auto;
+}
+
+/* 代码块头部（语言标签 + 复制按钮） */
+.pi-chat-code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.pi-chat-code-lang {
+    font-family: var(--font-monospace);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pi-chat-copy-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.pi-chat-copy-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+/* 代码块内容 */
+.pi-chat-msg-assistant pre code {
+    display: block;
+    padding: 12px;
+    background: none;
+    overflow-x: auto;
+}
+
+/* 标题 */
+.pi-chat-msg-assistant h1 {
+    font-size: 1.4em;
+    border-bottom: 1px solid var(--background-modifier-border);
+    padding-bottom: 4px;
+    margin: 12px 0 6px;
+}
+.pi-chat-msg-assistant h2 {
+    font-size: 1.2em;
+    border-bottom: 1px solid var(--background-modifier-border);
+    padding-bottom: 3px;
+    margin: 10px 0 5px;
+}
+.pi-chat-msg-assistant h3 {
+    font-size: 1.1em;
+    margin: 8px 0 4px;
+}
+
+/* 引用 */
+.pi-chat-msg-assistant blockquote {
+    margin: 8px 0;
+    padding: 4px 12px;
+    border-left: 3px solid var(--color-accent);
+    background: var(--background-primary);
+    border-radius: 0 4px 4px 0;
+}
+.pi-chat-msg-assistant blockquote p {
+    margin: 2px 0;
+}
+
+/* 表格 */
+.pi-chat-msg-assistant table {
+    border-collapse: collapse;
+    margin: 8px 0;
+    width: 100%;
+    font-size: var(--font-ui-small);
+}
+.pi-chat-msg-assistant th,
+.pi-chat-msg-assistant td {
+    border: 1px solid var(--background-modifier-border);
+    padding: 6px 10px;
+    text-align: left;
+}
+.pi-chat-msg-assistant th {
+    background: var(--background-secondary);
+    font-weight: var(--font-semibold);
+}
+.pi-chat-msg-assistant tr:nth-child(even) {
+    background: var(--background-primary);
+}
+
+/* 分割线 */
+.pi-chat-msg-assistant hr {
+    border: none;
+    border-top: 1px solid var(--background-modifier-border);
+    margin: 12px 0;
 }

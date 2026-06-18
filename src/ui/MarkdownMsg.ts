@@ -1,6 +1,7 @@
 // 流式 Markdown 渲染模块
 // 将 AI 回复的 markdown 文本实时渲染到消息气泡中
-import { App, MarkdownRenderer, Component } from 'obsidian';
+// 自动为代码块添加语言标签和复制按钮
+import { App, MarkdownRenderer, Component, Notice } from 'obsidian';
 
 export class MarkdownMsg {
     // 当前累积的原始 markdown 文本
@@ -34,10 +35,9 @@ export class MarkdownMsg {
         return this.text;
     }
 
-    // ── 安排渲染（避免频繁重复渲染） ────────────
+    // ── 安排渲染 ────────────────────────────────
     private scheduleRender(): void {
         if (this.rendering) {
-            // 正在渲染中，标记为"需要重绘"
             this.needsRerender = true;
             return;
         }
@@ -47,16 +47,11 @@ export class MarkdownMsg {
     // ── 实际渲染 ────────────────────────────────
     private async render(): Promise<void> {
         this.rendering = true;
-
         try {
             do {
                 this.needsRerender = false;
-
-                // 清空容器
                 this.container.empty();
 
-                // 用 Obsidian 的 MarkdownRenderer 渲染
-                // sourcePath 设为 "/" 表示 vault 根目录（用于解析内部链接）
                 await MarkdownRenderer.render(
                     this.app,
                     this.text,
@@ -64,15 +59,64 @@ export class MarkdownMsg {
                     '/',
                     this.component,
                 );
+
+                // 渲染完成后增强代码块
+                this.enhanceCodeBlocks();
             } while (this.needsRerender);
         } catch (e) {
             console.error('Markdown render error:', e);
-            // 渲染失败时，至少显示纯文本
             if (!this.container.hasChildNodes()) {
                 this.container.setText(this.text);
             }
         } finally {
             this.rendering = false;
         }
+    }
+
+    // ── 增强代码块：加语言标签 + 复制按钮 ──────
+    private enhanceCodeBlocks(): void {
+        this.container.querySelectorAll('pre').forEach((pre) => {
+            const code = pre.querySelector('code');
+            if (!code || pre.hasAttribute('data-enhanced')) return;
+            pre.setAttribute('data-enhanced', 'true');
+
+            // 提取语言名
+            const classNames = code.className || '';
+            const langMatch = classNames.match(/language-(\w+)/);
+            const lang = langMatch ? langMatch[1] || '' : '';
+
+            // 创建头部栏（语言标签 + 复制按钮）
+            const header = document.createElement('div');
+            header.className = 'pi-chat-code-header';
+
+            const langLabel = document.createElement('span');
+            langLabel.className = 'pi-chat-code-lang';
+            langLabel.textContent = lang || 'code';
+            header.appendChild(langLabel);
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'pi-chat-copy-btn';
+            copyBtn.textContent = '复制';
+            copyBtn.addEventListener('click', async () => {
+                const codeText = (code as HTMLElement).textContent || '';
+                try {
+                    await navigator.clipboard.writeText(codeText);
+                    copyBtn.textContent = '已复制 ✓';
+                    setTimeout(() => {
+                        copyBtn.textContent = '复制';
+                    }, 2000);
+                } catch {
+                    new Notice('复制失败');
+                }
+            });
+            header.appendChild(copyBtn);
+
+            // 把 header 插到 pre 前面，然后包裹两者
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pi-chat-code-wrapper';
+            pre.parentNode?.insertBefore(wrapper, pre);
+            wrapper.appendChild(header);
+            wrapper.appendChild(pre);
+        });
     }
 }

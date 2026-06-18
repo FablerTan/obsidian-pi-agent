@@ -160,6 +160,45 @@ export class HistoryPanel {
         this.loadMessages(msgResp.data.messages || []);
     }
 
+    // ── 增强代码块（同 MarkdownMsg 中的逻辑） ──
+    private enhanceCodeBlocks(container: HTMLElement): void {
+        container.querySelectorAll('pre').forEach((pre) => {
+            const code = pre.querySelector('code');
+            if (!code || pre.hasAttribute('data-enhanced')) return;
+            pre.setAttribute('data-enhanced', 'true');
+
+            const classNames = code.className || '';
+            const langMatch = classNames.match(/language-(\w+)/);
+            const lang = langMatch ? langMatch[1] || '' : '';
+
+            const header = document.createElement('div');
+            header.className = 'pi-chat-code-header';
+            const langLabel = document.createElement('span');
+            langLabel.className = 'pi-chat-code-lang';
+            langLabel.textContent = lang || 'code';
+            header.appendChild(langLabel);
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'pi-chat-copy-btn';
+            copyBtn.textContent = '复制';
+            copyBtn.addEventListener('click', async () => {
+                const codeText = code.textContent || '';
+                try {
+                    await navigator.clipboard.writeText(codeText);
+                    copyBtn.textContent = '已复制 ✓';
+                    setTimeout(() => { copyBtn.textContent = '复制'; }, 2000);
+                } catch { new Notice('复制失败'); }
+            });
+            header.appendChild(copyBtn);
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pi-chat-code-wrapper';
+            pre.parentNode?.insertBefore(wrapper, pre);
+            wrapper.appendChild(header);
+            wrapper.appendChild(pre);
+        });
+    }
+
     // ── 清空并加载消息 ──────────────────────────
     private async loadMessages(messages: any[]): Promise<void> {
         this.messagesEl.empty();
@@ -191,6 +230,8 @@ export class HistoryPanel {
                     const el = this.messagesEl.createDiv({ cls: 'pi-chat-msg-assistant' });
                     // 用 Obsidian 的 MarkdownRenderer 渲染历史消息
                     await MarkdownRenderer.render(this.app, text, el, '/', this.messagesEl as any);
+                    // 增强代码块
+                    this.enhanceCodeBlocks(el);
                     hasContent = true;
                 }
             }
