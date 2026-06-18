@@ -8,10 +8,19 @@ If your plugin does not need CSS, delete this file.
 */
 
 /* ── Pi Chat 面板布局 ──────────────────── */
-.pi-chat-container {
+/* contentEl 变成 flex 列 */
+.pi-chat-wrapper {
     display: flex;
     flex-direction: column;
     height: 100%;
+}
+
+/* 内容区域（消息列表 + 输入框）占满剩余空间 */
+.pi-chat-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 /* 消息列表区域，可滚动 */
@@ -40,6 +49,31 @@ If your plugin does not need CSS, delete this file.
     text-align: center;
     color: var(--text-muted);
     margin-top: 40px;
+}
+
+/* ── 顶部横条 ──────────────────────── */
+.pi-chat-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    flex-shrink: 0;
+}
+
+.pi-chat-header-icon {
+    display: flex;
+    align-items: center;
+    width: 22px;
+    height: 22px;
+    color: var(--text-muted);
+}
+
+.pi-chat-header-title {
+    font-size: var(--font-ui-medium);
+    font-weight: var(--font-semibold);
+    color: var(--text-muted);
 }
 
 /* ── 加载动画 ──────────────────────── */

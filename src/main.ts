@@ -5,6 +5,7 @@ import {
 	Modal,
 	Notice,
 	Plugin,
+	addIcon,
 } from 'obsidian';
 import {
 	DEFAULT_SETTINGS,
@@ -24,6 +25,13 @@ export default class MyPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+
+		// 注册 pi 自定义图标（从 pi.dev 官网获取的 SVG）
+		// 后续在聊天面板顶部显示
+		addIcon('pi-logo', `<svg viewBox="0 0 800 800">
+			<path fill="currentColor" fill-rule="evenodd" d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"/>
+			<path fill="currentColor" d="M517.36 400 H634.72 V634.72 H517.36 Z"/>
+		</svg>`);
 
 		// 启动 pi RPC 客户端（后台连接 pi 进程）
 		this.piClient = new PiRpcClient();

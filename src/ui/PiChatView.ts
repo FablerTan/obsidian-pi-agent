@@ -1,7 +1,7 @@
 // 导入 Obsidian 的 ItemView 基类
 // ItemView: 可以在 Obsidian 工作区中创建自定义面板
 // WorkspaceLeaf: 每个视图都挂在一个"叶子"上
-import { ItemView, WorkspaceLeaf, Notice } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, setIcon } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 
 // 视图的唯一标识符，用来注册和查找这个视图
@@ -41,8 +41,17 @@ export class PiChatView extends ItemView {
     async onOpen(): Promise<void> {
         const { contentEl } = this;
         contentEl.empty();
+        contentEl.addClass('pi-chat-wrapper'); // ← 让 contentEl 变成 flex 列
 
-        // ── 整个面板用一个容器包裹 ────────────
+        // ── 顶部横条：显示 pi 图标 + 标题 ────
+        const header = contentEl.createDiv({ cls: 'pi-chat-header' });
+        // 在左边放 pi 图标
+        const iconEl = header.createSpan({ cls: 'pi-chat-header-icon' });
+        setIcon(iconEl, 'pi-logo');
+        // 图标右边显示标题
+        header.createSpan({ cls: 'pi-chat-header-title', text: 'Pi' });
+
+        // ── 整个内容区域（消息列表 + 输入框） ──
         const container = contentEl.createDiv({ cls: 'pi-chat-container' });
 
         // ── 消息列表区域（可滚动） ────────────
