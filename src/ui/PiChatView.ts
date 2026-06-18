@@ -56,6 +56,10 @@ export class PiChatView extends ItemView {
     private noteNameEl!: HTMLElement;            // 笔记名文字
     private noteToggleIcon!: HTMLElement;        // 切换图标
 
+    // ── 选中文本追踪 ──
+    private selectedText = '';                    // 当前选中的文本
+    private selectionInfoEl!: HTMLElement;         // 选中字数显示元素
+
     // RPC 客户端
     private piClient: PiRpcClient;
 
@@ -110,12 +114,15 @@ export class PiChatView extends ItemView {
         // ── 命令菜单容器（在 DOM 中位于输入框正上方，靠文档流排列） ──
         const menuContainer = inputArea.createDiv({ cls: 'pi-command-menu' });
 
-        // ── 当前笔记栏（显示笔记名，点击切换是否发送笔记地址） ──
+        // ── 当前笔记栏（显示笔记名 + 选中字数，点击笔记名切换是否发送笔记地址） ──
         this.noteBarEl = inputArea.createDiv({ cls: 'pi-chat-note-bar' });
-        this.noteToggleIcon = this.noteBarEl.createSpan({ cls: 'pi-chat-note-icon' });
-        this.noteNameEl = this.noteBarEl.createSpan({ cls: 'pi-chat-note-name', text: '无活动笔记' });
-        this.noteBarEl.addEventListener('click', () => this.toggleNoteAttach());
+        const noteLeft = this.noteBarEl.createSpan({ cls: 'pi-chat-note-left' });
+        this.noteToggleIcon = noteLeft.createSpan({ cls: 'pi-chat-note-icon' });
+        this.noteNameEl = noteLeft.createSpan({ cls: 'pi-chat-note-name', text: '无活动笔记' });
+        noteLeft.addEventListener('click', () => this.toggleNoteAttach());
         this.updateNoteIcon();
+        // 选中字数（右边）
+        this.selectionInfoEl = this.noteBarEl.createSpan({ cls: 'pi-chat-selection-info' });
 
         // 输入框
         this.textarea = inputArea.createEl('textarea', {
@@ -169,10 +176,15 @@ export class PiChatView extends ItemView {
 
                 // 如果开启了笔记附加，将笔记地址加在消息前面
                 let finalMsg = msg;
+                const parts: string[] = [];
                 if (this.noteAttached && this.currentNotePath) {
-                    finalMsg = `[当前笔记: ${this.currentNotePath}]
-
-${msg}`;
+                    parts.push(`[当前笔记: ${this.currentNotePath}]`);
+                }
+                if (this.selectedText) {
+                    parts.push(`[选中文本 (${this.selectedText.length} 字)]\n\n${this.selectedText}`);
+                }
+                if (parts.length > 0) {
+                    finalMsg = parts.join('\n\n') + '\n\n' + msg;
                 }
 
                 this.addUserMessage(msg);
@@ -207,6 +219,19 @@ ${msg}`;
         );
         // 初始加载当前笔记
         this.updateCurrentNote();
+
+        // ── 监听编辑器变化（内容改变时刷新选中文本） ──
+        this.registerEvent(
+            this.app.workspace.on('editor-change', (_editor: any) => {
+                this.updateSelectedText();
+            }),
+        );
+        // 鼠标松开时也刷新（无内容变化的纯选择）
+        this.app.workspace.containerEl.addEventListener('mouseup', () => {
+            this.updateSelectedText();
+        });
+        // 初始检查选中文本
+        this.updateSelectedText();
     }
 
     async onClose(): Promise<void> {
@@ -445,6 +470,27 @@ ${msg}`;
             this.currentNoteName = null;
             this.noteNameEl.setText('无活动笔记');
             this.noteBarEl.toggleClass('pi-chat-note-empty', true);
+        }
+        // 切换笔记时也刷新选中文本
+        this.updateSelectedText();
+    }
+
+    // ── 刷新选中文本显示 ──────────────────────
+    private updateSelectedText(): void {
+        const editor = this.app.workspace.activeEditor?.editor;
+        if (editor) {
+            const sel = editor.getSelection();
+            this.selectedText = sel || '';
+        } else {
+            this.selectedText = '';
+        }
+        if (this.selectedText) {
+            const count = this.selectedText.length;
+            this.selectionInfoEl.setText(`「选中 ${count} 字」`);
+            this.selectionInfoEl.toggleClass('pi-chat-selection-active', true);
+        } else {
+            this.selectionInfoEl.setText('');
+            this.selectionInfoEl.toggleClass('pi-chat-selection-active', false);
         }
     }
 

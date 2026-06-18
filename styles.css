@@ -129,33 +129,45 @@ If your plugin does not need CSS, delete this file.
 .pi-chat-note-bar {
     display: flex;
     align-items: center;
-    gap: 4px;
+    justify-content: space-between;
     padding: 3px 8px;
     font-size: 11px;
     color: var(--text-faint);
-    cursor: pointer;
     user-select: none;
     border-radius: 4px;
-    transition: background 0.15s, color 0.15s;
-    max-width: 60%;
-    align-self: flex-start;      /* 只在左边一块区域 */
+    transition: background 0.15s;
 }
 
 .pi-chat-note-bar:hover {
     background: var(--background-modifier-hover);
-    color: var(--text-muted);
+}
+
+/* 左侧（笔记图标 + 笔记名） */
+.pi-chat-note-left {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    max-width: 65%;
+    overflow: hidden;
+    border-radius: 4px;
+    padding: 1px 4px;
+    transition: background 0.15s;
+}
+
+.pi-chat-note-left:hover {
+    background: var(--background-modifier-hover);
 }
 
 /* 附加上下文时的激活状态 — 高亮色 + 左边框指示 */
-.pi-chat-note-attached {
+.pi-chat-note-attached .pi-chat-note-left {
     color: var(--color-accent);
     background: color-mix(in srgb, var(--color-accent) 10%, transparent);
     border-left: 2px solid var(--color-accent);
-    padding-left: 6px;
+    padding-left: 2px;
 }
 
-.pi-chat-note-attached:hover {
-    color: var(--color-accent);
+.pi-chat-note-attached .pi-chat-note-left:hover {
     background: color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 
@@ -172,11 +184,22 @@ If your plugin does not need CSS, delete this file.
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 200px;            /* 限制笔记名最大宽度 */
+    max-width: 180px;
 }
 
-.pi-chat-note-empty {
+.pi-chat-note-empty .pi-chat-note-name {
     font-style: italic;
+}
+
+/* ── 右侧选中文本信息 ────────────────── */
+.pi-chat-selection-info {
+    flex-shrink: 0;
+    color: var(--text-faint);
+    font-size: 11px;
+}
+
+.pi-chat-selection-active {
+    color: var(--color-accent);
 }
 
 /* 输入框，贴在底部 */
