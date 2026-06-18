@@ -237,8 +237,7 @@ If your plugin does not need CSS, delete this file.
     padding: 8px 12px;
     border-radius: 8px;
     margin-bottom: 8px;
-    max-width: 85%;
-    width: auto;            /* 占满可用宽度，随面板拉伸 */
+    width: auto;
     word-break: break-word;
     user-select: text;
 }
