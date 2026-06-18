@@ -188,11 +188,7 @@ export class ToolCallMsg {
         // 检查行数：超过5行才启用限制态
         this._hasManyLines = (text.match(/\n/g) || []).length >= 5;
 
-        // 有输出时至少切换到限制模式（如果当前是收起态）
-        if (this.state === 'collapsed') {
-            this.state = this._hasManyLines ? 'limited' : 'expanded';
-            this.applyState();
-        }
+        // 始终保留在收起态，用户点击头部再展开查看
     }
 
     // ── 标记执行完成 ──────────────────────────

@@ -274,7 +274,7 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | 方法 | 说明 |
 |------|------|
 | `render()` | 构建卡片 DOM：头部图标 + 名称 + 参数摘要 + 展开/收起箭头 + 主体（参数详情 + 输出） |
-| `setOutput(text)` | 设置/追加输出内容，自动展开卡片 |
+| `setOutput(text)` | 设置/追加输出内容，始终折叠，用户点击头部再展开查看 |
 | `setResult(result, isError)` | 标记执行完成，显示 ✓ 或 ✗ 图标，填入结果文本 |
 | `extractResultText(result)` | 从 result 对象提取纯文本 |
 | `formatArgsSummary()` | 格式化 args 为一行摘要（bash 显示命令，其他显示路径或首参） |
@@ -294,8 +294,8 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 ```
 
 **行为**：
-- 创建时默认收起（`.pi-chat-tool-body-collapsed`），有实时输出时自动展开
-- 头部点击切换展开/收起
+- 创建时默认收起（`.pi-chat-tool-body-collapsed`），有输出也保持收起，用户点击头部再展开查看
+- 头部点击切换三种状态：收起 → 限制5行 → 展开全部 → 收起
 - 状态图标三态：旋转动画（执行中）、绿色 ✓（成功）、红色 ✗（失败）
 
 **工具图标映射**（Lucide icons）：
