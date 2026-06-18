@@ -23,7 +23,7 @@ export class WelcomePage {
         const title = this.el.createDiv({ cls: 'pi-welcome-title' });
         const logo = title.createSpan({ cls: 'pi-welcome-logo' });
         setIcon(logo, 'pi-logo');
-        title.createSpan({ text: 'Pi Chat' });
+        title.createSpan({ text: 'Pi Agent' });
 
         // 内容容器
         this.el.createDiv({ cls: 'pi-welcome-sections' });

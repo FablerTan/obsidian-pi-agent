@@ -68,7 +68,7 @@ export class PiChatView extends ItemView {
     }
 
     getViewType(): string { return PI_CHAT_VIEW_TYPE; }
-    getDisplayText(): string { return 'Pi Chat'; }
+    getDisplayText(): string { return 'Pi Agent'; }
     getIcon(): string { return 'pi-logo'; }
 
     // ── 构建 UI ──────────────────────────────────
