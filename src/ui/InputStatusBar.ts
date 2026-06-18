@@ -34,7 +34,7 @@ export class InputStatusBar {
     };
 
     constructor(
-        private container: HTMLElement,      // .pi-chat-container，做下拉定位
+        private container: HTMLElement,      // .pi-chat-container
         private piClient: PiRpcClient,
     ) {
         this.el = container.createDiv({ cls: 'pi-input-status-bar' });
@@ -44,7 +44,10 @@ export class InputStatusBar {
         const modelIcon = this.modelBtn.createSpan({ cls: 'pi-status-icon' });
         setIcon(modelIcon, 'bot');
         this.modelNameEl = this.modelBtn.createSpan({ cls: 'pi-status-label' });
-        this.modelBtn.addEventListener('click', () => this.openModelPicker());
+        this.modelBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.openModelPicker();
+        });
 
         // 间隔
         this.el.createSpan({ cls: 'pi-status-sep', text: '·' });
@@ -59,9 +62,12 @@ export class InputStatusBar {
         // 加载初始状态
         this.loadState();
 
-        // 点击其他地方关闭下拉
-        this.el.addEventListener('click', (e) => e.stopPropagation());
-        activeDocument.addEventListener('click', () => this.closeDropdown());
+        // 点击下拉外部关闭
+        activeDocument.addEventListener('click', (e) => {
+            if (this.dropdownEl && !this.dropdownEl.contains(e.target as Node)) {
+                this.closeDropdown();
+            }
+        });
     }
 
     // ── 加载当前状态 ──────────────────────────
@@ -92,9 +98,8 @@ export class InputStatusBar {
         this.thinkingEl.setText(label);
     }
 
-    // ── 弹出模型选择列表 ──────────────────────
+    // ── 弹出模型选择列表（悬浮在按钮上方） ─────
     private async openModelPicker(): Promise<void> {
-        // 如果已经开着就关掉
         if (this.dropdownEl) {
             this.closeDropdown();
             return;
@@ -116,8 +121,15 @@ export class InputStatusBar {
             return;
         }
 
-        // 创建下拉浮层
-        this.dropdownEl = this.container.createDiv({ cls: 'pi-model-picker' });
+        // 计算按钮位置
+        const btnRect = this.modelBtn.getBoundingClientRect();
+
+        // 创建悬浮下拉
+        this.dropdownEl = activeDocument.body.createDiv({ cls: 'pi-model-picker' });
+        this.dropdownEl.style.position = 'fixed';
+        this.dropdownEl.style.left = btnRect.left + 'px';
+        this.dropdownEl.style.bottom = (window.innerHeight - btnRect.top) + 'px';
+        this.dropdownEl.style.minWidth = Math.max(btnRect.width, 240) + 'px';
 
         const list = this.dropdownEl.createEl('ul', { cls: 'pi-model-list' });
 
@@ -131,7 +143,7 @@ export class InputStatusBar {
             setIcon(iconSpan, PROVIDER_ICONS[model.provider] || 'bot');
 
             // 模型名
-            const nameSpan = li.createSpan({ cls: 'pi-model-name', text: model.name || model.id });
+            li.createSpan({ cls: 'pi-model-name', text: model.name || model.id });
 
             // 提供商标签
             li.createSpan({ cls: 'pi-model-provider', text: model.provider });
@@ -148,7 +160,7 @@ export class InputStatusBar {
             });
         }
 
-        // 阻止容器内点击冒泡关闭
+        // 阻止点击下拉内部关闭
         this.dropdownEl.addEventListener('click', (e) => e.stopPropagation());
     }
 
