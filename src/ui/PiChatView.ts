@@ -407,9 +407,29 @@ export class PiChatView extends ItemView {
         try {
             new Notice('正在重载 Pi…');
             await this.piClient.restart();
-            new Notice('Pi 已重载');
-            // 重载后刷新命令列表
-            this.loadCommands();
+            // 获取重载后的命令列表
+            const resp = await this.piClient.sendAndWait({ type: 'get_commands' });
+            if (resp?.success && resp.data?.commands) {
+                const cmds: any[] = resp.data.commands;
+                this.commandMenu.setCommands([
+                    { name: 'new', description: '新建会话', source: 'extension' as const },
+                    { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
+                    { name: 'history', description: '历史会话', source: 'extension' as const },
+                    ...cmds,
+                ]);
+                // 统计各类命令数量
+                const exts = cmds.filter(c => c.source === 'extension').length;
+                const skills = cmds.filter(c => c.source === 'skill').length;
+                const prompts = cmds.filter(c => c.source === 'prompt').length;
+                const parts: string[] = [];
+                if (exts) parts.push(`${exts} 个扩展`);
+                if (skills) parts.push(`${skills} 个技能`);
+                if (prompts) parts.push(`${prompts} 个模板`);
+                new Notice(`Pi 已重载 — ${parts.join(', ')}`);
+            } else {
+                new Notice('Pi 已重载');
+                this.loadCommands();
+            }
         } catch {
             new Notice('重载失败');
         }
