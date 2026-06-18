@@ -1,7 +1,7 @@
 // 导入 Obsidian 的 ItemView 基类
 // ItemView: 可以在 Obsidian 工作区中创建自定义面板
 // WorkspaceLeaf: 每个视图都挂在一个"叶子"上
-import { ItemView, WorkspaceLeaf, Notice, setIcon, Modal } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, setIcon, Modal, FileSystemAdapter } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -195,8 +195,8 @@ export class PiChatView extends ItemView {
 
         // 当前 vault 路径对应的会话子目录名
         // pi 把路径中的 / 替换为 -，去掉开头的 /，前后加 --
-        const basePath = (this.app.vault.adapter as any).basePath;
-        const encodedPath = basePath.replace(/^\//, '').replace(/\//g, '-');
+        const vaultPath = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
+        const encodedPath = vaultPath.replace(/^\//, '').replace(/\//g, '-');
         const projectDir = '--' + encodedPath + '--';
         const fullDir = path.join(sessionsDir, projectDir);
 

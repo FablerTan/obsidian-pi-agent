@@ -6,6 +6,7 @@ import {
 	Notice,
 	Plugin,
 	addIcon,
+	FileSystemAdapter,
 } from 'obsidian';
 import {
 	DEFAULT_SETTINGS,
@@ -35,7 +36,9 @@ export default class MyPlugin extends Plugin {
 
 		// 启动 pi RPC 客户端（后台连接 pi 进程）
 		this.piClient = new PiRpcClient();
-		this.piClient.start((this.app.vault.adapter as any).basePath);
+		// 获取 vault 根目录的实际路径，传给 pi 作为工作目录
+		const vaultPath = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
+		this.piClient.start(vaultPath);
 
 		// 注册聊天面板视图，把 piClient 传进去
 		this.registerView(
