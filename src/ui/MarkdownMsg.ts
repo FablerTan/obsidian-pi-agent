@@ -83,40 +83,24 @@ export class MarkdownMsg {
             // 提取语言名
             const classNames = code.className || '';
             const langMatch = classNames.match(/language-(\w+)/);
-            const lang = langMatch ? langMatch[1] || '' : '';
+            const lang = langMatch ? langMatch[1] || '' : 'code';
 
-            // 创建头部栏（语言标签 + 复制按钮）
-            const header = document.createElement('div');
-            header.className = 'pi-chat-code-header';
-
-            const langLabel = document.createElement('span');
-            langLabel.className = 'pi-chat-code-lang';
-            langLabel.textContent = lang || 'code';
-            header.appendChild(langLabel);
-
-            const copyBtn = document.createElement('button');
-            copyBtn.className = 'pi-chat-copy-btn';
-            copyBtn.textContent = '复制';
-            copyBtn.addEventListener('click', async () => {
+            // 右上角语言标签，点击复制整个代码块
+            const label = document.createElement('span');
+            label.className = 'pi-chat-code-lang';
+            label.textContent = lang;
+            label.title = '点击复制代码';
+            label.addEventListener('click', async () => {
                 const codeText = (code as HTMLElement).textContent || '';
                 try {
                     await navigator.clipboard.writeText(codeText);
-                    copyBtn.textContent = '已复制 ✓';
-                    setTimeout(() => {
-                        copyBtn.textContent = '复制';
-                    }, 2000);
+                    label.textContent = '已复制 ✓';
+                    setTimeout(() => { label.textContent = lang; }, 2000);
                 } catch {
                     new Notice('复制失败');
                 }
             });
-            header.appendChild(copyBtn);
-
-            // 把 header 插到 pre 前面，然后包裹两者
-            const wrapper = document.createElement('div');
-            wrapper.className = 'pi-chat-code-wrapper';
-            pre.parentNode?.insertBefore(wrapper, pre);
-            wrapper.appendChild(header);
-            wrapper.appendChild(pre);
+            pre.appendChild(label);
         });
     }
 }

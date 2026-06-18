@@ -266,60 +266,39 @@ If your plugin does not need CSS, delete this file.
     font-size: 0.9em;
 }
 
-/* 代码块容器 */
-.pi-chat-code-wrapper {
-    margin: 6px 0;
-    border-radius: 6px;
-    overflow: hidden;
-    border: 1px solid var(--background-modifier-border);
-}
-
+/* 代码块（整体显示） */
 .pi-chat-msg-assistant pre {
-    margin: 0;
-    padding: 0;
+    position: relative;
+    margin: 6px 0;
+    padding: 12px;
+    padding-top: 28px;       /* 给右上角的语言标签留空间 */
     background: var(--background-primary);
+    border-radius: 6px;
+    border: 1px solid var(--background-modifier-border);
     overflow-x: auto;
 }
 
-/* 代码块头部（语言标签 + 复制按钮） */
-.pi-chat-code-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 4px 12px;
-    font-size: 12px;
-    color: var(--text-muted);
-    border-bottom: 1px solid var(--background-modifier-border);
+.pi-chat-msg-assistant pre code {
+    display: block;
+    background: none;
 }
 
+/* 语言标签（右上角，点击复制代码） */
 .pi-chat-code-lang {
+    position: absolute;
+    top: 4px;
+    right: 8px;
     font-family: var(--font-monospace);
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-}
-
-.pi-chat-copy-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
+    color: var(--text-faint);
     cursor: pointer;
-    font-size: 12px;
-    padding: 2px 6px;
-    border-radius: 3px;
+    user-select: none;
 }
 
-.pi-chat-copy-btn:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-}
-
-/* 代码块内容 */
-.pi-chat-msg-assistant pre code {
-    display: block;
-    padding: 12px;
-    background: none;
-    overflow-x: auto;
+.pi-chat-code-lang:hover {
+    color: var(--text-muted);
 }
 
 /* 标题 */
