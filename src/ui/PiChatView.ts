@@ -228,12 +228,16 @@ export class PiChatView extends ItemView {
         // ── 监听编辑器变化（内容改变时刷新选中文本） ──
         this.registerEvent(
             this.app.workspace.on('editor-change', (_editor: any) => {
-                this.updateSelectedText();
+                // 编辑器内容改变 → 用户操作了编辑器 → 无选中时清空
+                this.updateSelectedText(true);
             }),
         );
         // 鼠标松开时也刷新（无内容变化的纯选择）
-        this.app.workspace.containerEl.addEventListener('mouseup', () => {
-            this.updateSelectedText();
+        // 点击编辑器内移动光标 → 取消选中；点击外面 → 保留选中
+        this.app.workspace.containerEl.addEventListener('mouseup', (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            const inEditor = !!target.closest('.cm-editor, .markdown-source-view');
+            this.updateSelectedText(inEditor);
         });
         // 初始检查选中文本
         this.updateSelectedText();
@@ -498,15 +502,18 @@ export class PiChatView extends ItemView {
     }
 
     // ── 刷新选中文本显示 ──────────────────────
-    private updateSelectedText(): void {
+    // clickInEditor: true=点击在编辑器内部（移动光标应取消选中）
+    private updateSelectedText(clickInEditor = false): void {
         const editor = this.app.workspace.activeEditor?.editor;
         if (editor) {
             const sel = editor.getSelection();
-            // 只有编辑器有实际选中内容时才更新
-            // 失焦/点到别处导致的空选区不覆盖 lastSelectedText
             if (sel) {
                 this.selectedText = sel;
+            } else if (clickInEditor) {
+                // 用户点击了编辑器内部但没有选中 → 取消选中
+                this.selectedText = '';
             }
+            // 点击编辑器外部且无选中 → 保留上次选中
         }
         // activeEditor 为 null 不处理，保留上次选中
         this.updateSelectionDisplay();
