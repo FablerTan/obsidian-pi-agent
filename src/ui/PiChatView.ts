@@ -1,7 +1,7 @@
 // 导入 Obsidian 的 ItemView 基类
 // ItemView: 可以在 Obsidian 工作区中创建自定义面板
 // WorkspaceLeaf: 每个视图都挂在一个"叶子"上
-import { ItemView, WorkspaceLeaf, Notice, setIcon, FileSystemAdapter } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, setIcon, FileSystemAdapter, MarkdownView } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 import { HistoryPanel } from './HistoryPanel';
 import { MarkdownMsg } from './MarkdownMsg';
@@ -47,6 +47,14 @@ export class PiChatView extends ItemView {
 
     // 5 秒超时保护定时器
     private loadingTimeout: number | null = null;
+
+    // ── 当前笔记追踪 ──
+    private currentNotePath: string | null = null;
+    private currentNoteName: string | null = null;
+    private noteAttached = false;               // 是否发送笔记地址给 pi
+    private noteBarEl!: HTMLElement;             // 笔记名显示栏
+    private noteNameEl!: HTMLElement;            // 笔记名文字
+    private noteToggleIcon!: HTMLElement;        // 切换图标
 
     // RPC 客户端
     private piClient: PiRpcClient;
@@ -102,6 +110,13 @@ export class PiChatView extends ItemView {
         // ── 命令菜单容器（在 DOM 中位于输入框正上方，靠文档流排列） ──
         const menuContainer = inputArea.createDiv({ cls: 'pi-command-menu' });
 
+        // ── 当前笔记栏（显示笔记名，点击切换是否发送笔记地址） ──
+        this.noteBarEl = inputArea.createDiv({ cls: 'pi-chat-note-bar' });
+        this.noteToggleIcon = this.noteBarEl.createSpan({ cls: 'pi-chat-note-icon' });
+        this.noteNameEl = this.noteBarEl.createSpan({ cls: 'pi-chat-note-name', text: '无活动笔记' });
+        this.noteBarEl.addEventListener('click', () => this.toggleNoteAttach());
+        this.updateNoteIcon();
+
         // 输入框
         this.textarea = inputArea.createEl('textarea', {
             cls: 'pi-chat-input',
@@ -152,10 +167,18 @@ export class PiChatView extends ItemView {
                 const msg = textarea.value.trim();
                 if (!msg) return;
 
+                // 如果开启了笔记附加，将笔记地址加在消息前面
+                let finalMsg = msg;
+                if (this.noteAttached && this.currentNotePath) {
+                    finalMsg = `[当前笔记: ${this.currentNotePath}]
+
+${msg}`;
+                }
+
                 this.addUserMessage(msg);
                 textarea.value = '';
                 this.showLoading();
-                this.piClient.prompt(msg);
+                this.piClient.prompt(finalMsg);
 
                 // 5 秒超时保护
                 this.loadingTimeout = window.setTimeout(() => {
@@ -175,6 +198,15 @@ export class PiChatView extends ItemView {
 
         // 预加载命令列表（首次 / 时不用等待）
         this.loadCommands();
+
+        // ── 监听当前活动笔记变化 ──
+        this.registerEvent(
+            this.app.workspace.on('active-leaf-change', () => {
+                this.updateCurrentNote();
+            }),
+        );
+        // 初始加载当前笔记
+        this.updateCurrentNote();
     }
 
     async onClose(): Promise<void> {
@@ -386,6 +418,34 @@ export class PiChatView extends ItemView {
         this.commandMenu.hide();
         this.textarea.value = '';
         this.historyPanel.open();
+    }
+
+    // ── 切换是否发送笔记地址 ──────────────────
+    private toggleNoteAttach(): void {
+        this.noteAttached = !this.noteAttached;
+        this.updateNoteIcon();
+    }
+
+    // ── 更新笔记栏图标状态 ────────────────────
+    private updateNoteIcon(): void {
+        this.noteBarEl.toggleClass('pi-chat-note-attached', this.noteAttached);
+        setIcon(this.noteToggleIcon, this.noteAttached ? 'pin' : 'file-text');
+    }
+
+    // ── 从活动编辑器更新当前笔记 ──────────────
+    private updateCurrentNote(): void {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (view?.file) {
+            this.currentNotePath = view.file.path;
+            this.currentNoteName = view.file.name;
+            this.noteNameEl.setText(this.currentNoteName);
+            this.noteBarEl.toggleClass('pi-chat-note-empty', false);
+        } else {
+            this.currentNotePath = null;
+            this.currentNoteName = null;
+            this.noteNameEl.setText('无活动笔记');
+            this.noteBarEl.toggleClass('pi-chat-note-empty', true);
+        }
     }
 
     // ── 处理 /reload ──────────────────────────

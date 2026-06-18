@@ -125,6 +125,54 @@ If your plugin does not need CSS, delete this file.
     background: var(--background-modifier-hover);
 }
 
+/* ── 当前笔记栏 ──────────────────────── */
+.pi-chat-note-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--text-faint);
+    cursor: pointer;
+    user-select: none;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.pi-chat-note-bar:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-muted);
+}
+
+/* 附加上下文时的激活状态 */
+.pi-chat-note-attached {
+    color: var(--color-accent);
+}
+
+.pi-chat-note-attached:hover {
+    color: var(--color-accent);
+    background: var(--background-modifier-hover);
+}
+
+.pi-chat-note-icon {
+    width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.pi-chat-note-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pi-chat-note-empty {
+    font-style: italic;
+}
+
 /* 输入框，贴在底部 */
 .pi-chat-input {
     width: 100%;
