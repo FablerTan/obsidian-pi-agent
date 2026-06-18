@@ -505,6 +505,11 @@ export class PiChatView extends ItemView {
                 this.previousCmdNames = new Set(cmds.map((c: any) => c.name));
                 this.previousCmdList = cmds.map((c: any) => ({ name: c.name, source: c.source || 'other' }));
             } else {
+                // get_commands 失败：用局部变量 oldCmdList / oldNames 展示缓存数据
+                // 不修改 this.previousCmdNames / this.previousCmdList，
+                // 不清空也不调用 loadCommands()。因为 loadCommands 是 fire-and-forget，
+                // 其 pending 请求会被后续 restart() 的 pendingRequests.clear() 孤儿化，
+                // 导致 previousCmdNames 永久为空，后续所有 reload 都显示全部为新。
                 if (oldCmdList.length > 0) {
                     this.addSystemMessage('refresh-cw', 'Pi 已重载（命令列表未更新）', (el) => {
                         this.renderReloadFromCache(el, oldCmdList, oldNames);
@@ -514,9 +519,6 @@ export class PiChatView extends ItemView {
                         el.createDiv({ cls: 'pi-reload-note', text: '未能获取命令列表，请检查 pi 是否正常运行' });
                     });
                 }
-                this.loadCommands();
-                this.previousCmdNames = new Set();
-                this.previousCmdList = [];
             }
         } catch {
             new Notice('重载失败');
