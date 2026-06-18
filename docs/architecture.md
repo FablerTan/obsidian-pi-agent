@@ -109,7 +109,9 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `loadCommands()` | 从 pi 加载可用命令列表（`get_commands`），传给 CommandMenu，同时保存不含 builtins 的命令名和数据到 `previousCmdNames` / `previousCmdList` |
 | `handleNewSession()` | 发送 `new_session` RPC，清空消息列表 + 输入框 + 加载状态 |
 
-| `handleReload()` | 重启 pi 子进程，对比命令列表变化，显示分组详情（新增绿色、移除红色+删除线）；一开始就将 `previousCmdNames` 捕获到局部常量 `oldNames`，后续对比基于此，不受副作用影响；`get_commands` 失败时不修改 `previousCmdNames`/`previousCmdList`，避免异步 `loadCommands` 被孤儿化导致对比基准永久丢失 |
+| `handleReload()` | 重启 pi 子进程，获取命令列表（最多重试 3 次，间隔 600ms），成功则对比变化显示分组详情（新增绿色、移除红色+删除线），失败则缓存回退；一开始就将 `previousCmdNames` 捕获到局部常量 `oldNames` |
+| `handleReloadSuccess(cmds, oldNames, oldCmdList)` | reload 成功后渲染命令列表分组 + 对比新增/移除，保存新数据 |
+| `handleReloadFallback(oldCmdList, oldNames)` | reload 失败后用缓存数据回退显示，不修改 `previousCmdNames`/`previousCmdList` |
 | `fetchCurrentCmdNames()` | 从当前 pi 进程获取命令名集合，`previousCmdNames` 为空时作为对比基准 |
 | `renderReloadGroup(el, label, items, oldNames, removedNames)` | 渲染 reload 消息中的一个分组（扩展/技能/模板等），使用传入的 `oldNames` 判断新增，逐项标记 |
 | `renderReloadFromCache(el, cmds, oldNames)` | `get_commands` 失败时用缓存数据回退渲染具体列表，同样使用传入的 `oldNames` |
