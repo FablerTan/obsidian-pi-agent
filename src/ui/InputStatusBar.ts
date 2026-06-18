@@ -75,8 +75,11 @@ export class InputStatusBar {
     }
 
     // ── 应用状态到 UI ─────────────────────────
+    // data 可能来自 get_state/cycle_model: { model: {...}, thinkingLevel: '...' }
+    // 也可能来自 set_model: Model 对象直接 { name: '...', id: '...', ... }
     private applyState(data: any): void {
-        const modelName = data.model?.name || data.model?.id || '未知';
+        const model = data.model || data;
+        const modelName = model?.name || model?.id || '未知';
         const thinkingLevel = data.thinkingLevel || '';
         this.state = { modelName, thinkingLevel };
         this.render();
@@ -159,8 +162,9 @@ export class InputStatusBar {
                 modelId: model.id,
             });
             if (resp?.success) {
-                // set_model 的 data 包含完整的 model 对象
-                this.applyState(resp.data || model);
+                // set_model 的 data 是 Model 对象直接（不含 thinkingLevel）
+                this.state.modelName = resp.data?.name || resp.data?.id || '未知';
+                this.render();
                 new Notice(`已切换到 ${model.name || model.id}`);
             } else {
                 new Notice('切换模型失败: ' + (resp?.error || '未知错误'));
