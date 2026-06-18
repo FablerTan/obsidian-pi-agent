@@ -71,8 +71,9 @@ export class PiChatView extends ItemView {
         const toolbar = container.createDiv({ cls: 'pi-chat-toolbar' });
         const historyBtn = toolbar.createEl('button', {
             cls: 'pi-chat-history-btn',
-            text: '📋 历史',
         });
+        // 用 Obsidian 内置图标代替文字
+        setIcon(historyBtn, 'history');
         historyBtn.addEventListener('click', () => {
             this.openHistory();
         });

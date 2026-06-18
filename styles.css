@@ -43,16 +43,21 @@ If your plugin does not need CSS, delete this file.
 
 .pi-chat-history-btn {
     background: none;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    padding: 2px 8px;
-    font-size: 12px;
+    border: none;
+    padding: 4px;
+    width: 28px;
+    height: 28px;
     color: var(--text-muted);
     cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .pi-chat-history-btn:hover {
     background: var(--background-modifier-hover);
+    color: var(--text-normal);
 }
 
 /* ── 历史会话弹窗 ──────────────────── */
