@@ -446,6 +446,26 @@ If your plugin does not need CSS, delete this file.
     padding: 1px 5px;
     border-radius: 3px;
     color: var(--text-muted);
+    position: relative;
+}
+
+.pi-reload-item-new {
+    color: var(--color-green);
+}
+
+.pi-reload-item-new::after {
+    content: 'NEW';
+    font-size: 8px;
+    font-weight: var(--font-semibold);
+    color: var(--color-green);
+    margin-left: 3px;
+    vertical-align: super;
+}
+
+.pi-reload-item-removed {
+    text-decoration: line-through;
+    color: var(--text-faint);
+    opacity: 0.7;
 }
 
 .pi-reload-none {

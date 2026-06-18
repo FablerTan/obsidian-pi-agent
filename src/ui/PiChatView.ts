@@ -54,6 +54,9 @@ export class PiChatView extends ItemView {
     // 5 秒超时保护定时器
     private loadingTimeout: number | null = null;
 
+    // 上一次加载的命令名集合（用于 /reload 对比新增/移除）
+    private previousCmdNames: Set<string> = new Set();
+
     // RPC 客户端
     private piClient: PiRpcClient;
 
@@ -348,7 +351,10 @@ export class PiChatView extends ItemView {
                     { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
                     { name: 'history', description: '历史会话', source: 'extension' as const },
                 ];
-                this.commandMenu.setCommands([...builtins, ...resp.data.commands]);
+                const allCmds = [...builtins, ...resp.data.commands];
+                this.commandMenu.setCommands(allCmds);
+                // 保存命令名用于 reload 对比
+                this.previousCmdNames = new Set(allCmds.map((c: any) => c.name));
             }
         } catch { /* pi 还未就绪，忽略 */ }
     }
@@ -446,30 +452,51 @@ export class PiChatView extends ItemView {
                 this.addSystemMessage('refresh-cw', 'Pi 已重载', (el) => {
                     const order = ['extension', 'skill', 'prompt'];
                     const labels: Record<string, string> = { extension: '扩展', skill: '技能', prompt: '模板' };
-                    let hasContent = false;
                     for (const key of order) {
                         const items = groups.get(key);
                         if (items && items.length > 0) {
-                            hasContent = true;
                             const section = el.createDiv({ cls: 'pi-reload-section' });
                             section.createSpan({ cls: 'pi-reload-label', text: labels[key] || key });
                             section.createSpan({ cls: 'pi-reload-count', text: String(items.length) });
                             const itemsWrap = el.createDiv({ cls: 'pi-reload-items' });
                             for (const n of items) {
-                                itemsWrap.createSpan({ cls: 'pi-reload-item', text: n });
+                                const isNew = !this.previousCmdNames.has(n);
+                                const isRemoved = false; // 在同组内无法判断移除，后面整体比对
+                                const itemEl = itemsWrap.createSpan({ cls: 'pi-reload-item' });
+                                itemEl.setText(n);
+                                if (isNew) itemEl.addClass('pi-reload-item-new');
                             }
                         }
                         groups.delete(key);
                     }
-                    if (!hasContent) {
-                        el.createSpan({ cls: 'pi-reload-none', text: '没有更新' });
+                    // 检查被移除的命令
+                    const newNames = new Set(cmds.map((c: any) => c.name));
+                    const removed: string[] = [];
+                    for (const old of this.previousCmdNames) {
+                        if (!newNames.has(old) && old !== 'new' && old !== 'reload' && old !== 'history') {
+                            removed.push(old);
+                        }
+                    }
+                    if (removed.length > 0) {
+                        const section = el.createDiv({ cls: 'pi-reload-section' });
+                        section.createSpan({ cls: 'pi-reload-label', text: '已移除' });
+                        section.createSpan({ cls: 'pi-reload-count', text: String(removed.length) });
+                        const itemsWrap = el.createDiv({ cls: 'pi-reload-items' });
+                        for (const n of removed) {
+                            const itemEl = itemsWrap.createSpan({ cls: 'pi-reload-item pi-reload-item-removed' });
+                            itemEl.setText(n);
+                        }
                     }
                 });
+                // 保存新命令名供下次对比
+                this.previousCmdNames = new Set(cmds.map((c: any) => c.name));
             } else {
                 this.addSystemMessage('refresh-cw', 'Pi 已重载', (el) => {
                     el.createSpan({ cls: 'pi-reload-none', text: '没有更新' });
                 });
                 this.loadCommands();
+                // 重置对比基准
+                this.previousCmdNames = new Set();
             }
         } catch {
             new Notice('重载失败');
