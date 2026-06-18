@@ -400,6 +400,17 @@ export class PiChatView extends ItemView {
 
 
 
+    // ── 添加系统通知消息 ──────────────────────
+    private addSystemMessage(html: string): void {
+        if (this.welcomePage) {
+            this.welcomePage.remove();
+            this.welcomePage = null as any;
+        }
+        const msgEl = this.messagesEl.createDiv({ cls: 'pi-chat-msg-system' });
+        msgEl.innerHTML = html;
+        this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+    }
+
     // ── 处理 /reload ──────────────────────────
     private async handleReload(): Promise<void> {
         this.commandMenu.hide();
@@ -407,17 +418,45 @@ export class PiChatView extends ItemView {
         try {
             new Notice('正在重载 Pi…');
             await this.piClient.restart();
-            // 清空消息列表，重新显示欢迎页（展示最新的 skill/extension/prompt）
-            this.messagesEl.empty();
-            this.currentMarkdown = null;
-            this.currentAssistantEl = null;
-            this.thinkingBlock = null;
-            this.toolCalls.clear();
-            this.welcomePage = new WelcomePage(this.messagesEl, this.app, this.piClient);
-            this.welcomePage.loadData();
-            // 刷新命令菜单
-            this.loadCommands();
-            new Notice('Pi 已重载');
+            // 获取重载后的命令列表
+            const resp = await this.piClient.sendAndWait({ type: 'get_commands' });
+            if (resp?.success && resp.data?.commands) {
+                const cmds: any[] = resp.data.commands;
+                this.commandMenu.setCommands([
+                    { name: 'new', description: '新建会话', source: 'extension' as const },
+                    { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
+                    { name: 'history', description: '历史会话', source: 'extension' as const },
+                    ...cmds,
+                ]);
+                // 分组统计
+                const groups = new Map<string, string[]>();
+                for (const c of cmds) {
+                    const src = c.source || 'other';
+                    if (!groups.has(src)) groups.set(src, []);
+                    groups.get(src)!.push(c.name);
+                }
+                // 构建通知消息
+                let html = '<div class="pi-reload-header">🔄 Pi 已重载</div>';
+                const order = ['extension', 'skill', 'prompt'];
+                const labels: Record<string, string> = { extension: '扩展', skill: '技能', prompt: '模板' };
+                for (const key of order) {
+                    const items = groups.get(key);
+                    if (items && items.length > 0) {
+                        html += `<div class="pi-reload-section"><span class="pi-reload-label">${labels[key] || key}</span> <span class="pi-reload-count">${items.length}</span></div>`;
+                        html += '<div class="pi-reload-items">' + items.map(n => `<span class="pi-reload-item">${n}</span>`).join('') + '</div>';
+                    }
+                    groups.delete(key);
+                }
+                for (const [key, items] of groups) {
+                    if (items.length > 0) {
+                        html += `<div class="pi-reload-section"><span class="pi-reload-label">${key}</span> <span class="pi-reload-count">${items.length}</span></div>`;
+                    }
+                }
+                this.addSystemMessage(html);
+            } else {
+                this.addSystemMessage('<div class="pi-reload-header">🔄 Pi 已重载</div>');
+                this.loadCommands();
+            }
         } catch {
             new Notice('重载失败');
         }

@@ -372,6 +372,59 @@ If your plugin does not need CSS, delete this file.
     user-select: text;
 }
 
+/* ── 系统通知消息（/reload 等） ───────────── */
+.pi-chat-msg-system {
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    font-size: var(--font-ui-small);
+    user-select: text;
+}
+
+.pi-reload-header {
+    font-weight: var(--font-semibold);
+    color: var(--text-normal);
+    margin-bottom: 6px;
+}
+
+.pi-reload-section {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.pi-reload-label {
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pi-reload-count {
+    font-weight: var(--font-semibold);
+    color: var(--text-accent);
+    font-size: 12px;
+}
+
+.pi-reload-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 3px;
+}
+
+.pi-reload-item {
+    font-family: var(--font-monospace);
+    font-size: 10px;
+    background: var(--background-secondary);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--text-muted);
+}
+
 /* markdown 渲染内容的通用样式 */
 .pi-chat-msg-assistant p {
     margin: 0 0 6px 0;
