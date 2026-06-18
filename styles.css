@@ -22,6 +22,7 @@ If your plugin does not need CSS, delete this file.
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    position: relative; /* 给命令菜单做定位基准 */
 }
 
 /* 消息列表区域，可滚动 */
@@ -362,4 +363,216 @@ If your plugin does not need CSS, delete this file.
     border: none;
     border-top: 1px solid var(--background-modifier-border);
     margin: 12px 0;
+}
+
+
+/* ── 命令菜单（/ 命令自动补全） ────────── */
+.pi-command-menu {
+    position: absolute;
+    bottom: 100%;          /* 贴在输入框上方 */
+    left: 4px;
+    right: 4px;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+    z-index: 50;
+    margin-bottom: 4px;
+}
+
+.pi-command-list {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+}
+
+.pi-command-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: var(--font-ui-small);
+}
+
+.pi-command-item:hover,
+.pi-command-item-selected {
+    background: var(--background-modifier-hover);
+}
+
+.pi-command-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-accent);
+}
+
+.pi-command-name {
+    font-family: var(--font-monospace);
+    font-weight: var(--font-semibold);
+    color: var(--text-normal);
+    flex-shrink: 0;
+}
+
+.pi-command-desc {
+    color: var(--text-muted);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* ── 工具调用卡片 ──────────────────── */
+/* 工具卡片在助手气泡内部时，与文字之间留间距 */
+.pi-chat-msg-assistant > .pi-chat-tool-wrapper {
+    margin-top: 8px;
+}
+.pi-chat-msg-assistant > .pi-chat-tool-wrapper:last-child {
+    margin-bottom: 0;
+}
+
+.pi-chat-tool-call {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-primary);
+    overflow: hidden;
+    font-size: var(--font-ui-small);
+}
+
+.pi-chat-tool-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+}
+
+.pi-chat-tool-header:hover {
+    background: var(--background-modifier-hover);
+}
+
+.pi-chat-tool-status {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+}
+
+.pi-chat-tool-status.pi-chat-tool-success {
+    color: var(--color-green);
+}
+
+.pi-chat-tool-status.pi-chat-tool-error {
+    color: var(--color-red);
+}
+
+/* 旋转动画（loader 图标） */
+.pi-chat-tool-spin {
+    animation: pi-tool-spin 1s linear infinite;
+}
+
+@keyframes pi-tool-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+.pi-chat-tool-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-accent);
+}
+
+.pi-chat-tool-name {
+    font-family: var(--font-monospace);
+    font-weight: var(--font-semibold);
+    color: var(--text-normal);
+    flex-shrink: 0;
+}
+
+.pi-chat-tool-args-summary {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-family: var(--font-monospace);
+    font-size: 11px;
+}
+
+.pi-chat-tool-toggle {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-faint);
+    transition: transform 0.2s;
+}
+
+/* 收起时图标朝右 */
+.pi-chat-tool-collapsed .pi-chat-tool-toggle {
+    transform: rotate(-90deg);
+}
+
+/* ── 主体（参数详情 + 输出） ── */
+.pi-chat-tool-body {
+    border-top: 1px solid var(--background-modifier-border);
+    max-height: 400px;
+    overflow-y: auto;
+    transition: max-height 0.2s, opacity 0.2s;
+}
+
+.pi-chat-tool-body-collapsed {
+    max-height: 0;
+    border-top: none;
+    overflow: hidden;
+    opacity: 0;
+}
+
+/* 参数详情 */
+.pi-chat-tool-args-detail {
+    background: var(--background-secondary);
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.pi-chat-tool-args-detail pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* 输出内容 */
+.pi-chat-tool-output {
+    padding: 6px 10px;
+}
+
+.pi-chat-tool-output pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 11px;
+    color: var(--text-normal);
+    background: var(--background-primary);
+    max-height: 300px;
+    overflow-y: auto;
 }

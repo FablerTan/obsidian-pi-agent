@@ -10,6 +10,9 @@ src/
     rpc-client.ts       pi RPC 通信客户端
   ui/
     PiChatView.ts       聊天面板视图（核心 UI + 消息流）
+    MarkdownMsg.ts      流式 Markdown 渲染（代码块增强）
+    ToolCallMsg.ts      工具调用卡片（显示工具执行状态和结果）
+    CommandMenu.ts      命令菜单（输入 / 时弹出命令列表）
     HistoryPanel.ts     历史会话管理器（读取、浮层、切换）
   utils/
     helpers.ts          工具函数（文本提取等）
@@ -97,6 +100,9 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 | `appendAssistantText(text)` | 追加助手回复文字（灰色，靠左），流式追加到同一条 |
 | `showLoading()` / `hideLoading()` | 显示/隐藏加载动画（三个跳动圆点） |
 | `handlePiEvent(event)` | 处理 pi 返回的事件，更新 UI |
+| `getOrCreateAssistantEl()` | 获取或创建当前助手消息气泡容器（DOM 查询 + 缓存） |
+| `loadCommands()` | 从 pi 加载可用命令列表（`get_commands`），传给 CommandMenu |
+| `extractTextFromContent(content)` | 从 content 数组中提取纯文本 |
 
 **UI 结构**：
 ```
@@ -108,10 +114,27 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
         └── .pi-chat-input (输入框)
 ```
 
-**事件驱动**：
-- `message_update` + `text_delta` → 追加助手文字
-- `agent_end` → 回复完成
-- `error` / `extension_error` → 显示错误 Notice
+**事件驱动**（已处理的事件类型）：
+| 事件 | 处理 |
+|------|------|
+| `message_update` + `text_delta` | 追加助手文字 |
+| `message_update` + `toolcall_start` | 隐藏加载动画（纯工具回复无文字时） |
+| `tool_execution_start` | 创建 ToolCallMsg 卡片，显示工具名称和参数 |
+| `tool_execution_update` | 更新 ToolCallMsg 中的流式输出内容 |
+| `tool_execution_end` | 标记 ToolCallMsg 完成/失败，显示结果 |
+| `agent_end` | 回复完成，重置 `currentMarkdown` 和 `toolCalls` |
+| `error` / `extension_error` | 显示错误 Notice |
+| `toolcall_start` | 隐藏加载动画（纯工具回复无文字时，在 message_update 内） |
+
+**追踪状态**：
+- `toolCalls: Map<string, ToolCallMsg>` — 以 `toolCallId` 为键，追踪正在执行的工具
+
+**命令菜单**（详见 CommandMenu.ts）：
+- 输入 `/` 时弹出命令列表
+- 按 `↑` `↓` 切换，`Enter` 确认，`Escape` 关闭
+- 继续打字按 `startsWith` 筛选
+- 空格或删除 `/` 自动关闭
+- 命令在 `onOpen()` 时通过 `loadCommands()` 预加载
 
 **超时保护**：发消息后 5 秒无回复，移除加载动画并提示。
 
@@ -137,7 +160,89 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 
 ---
 
-### 5. `src/utils/helpers.ts` — 工具函数
+### 5. `src/ui/MarkdownMsg.ts` — 流式 Markdown 渲染
+
+**见 MarkdownMsg.ts 顶部注释**，渲染 AI 回复并增强代码块（语言标签 + 复制按钮）。
+
+---
+
+### 6. `src/ui/ToolCallMsg.ts` — 工具调用卡片
+
+**职责**：以卡片形式展示 Pi 调用的工具（bash、read、edit 等），包括名称、参数、执行状态和输出结果。
+
+| 方法 | 说明 |
+|------|------|
+| `render()` | 构建卡片 DOM：头部图标 + 名称 + 参数摘要 + 展开/收起箭头 + 主体（参数详情 + 输出） |
+| `setOutput(text)` | 设置/追加输出内容，自动展开卡片 |
+| `setResult(result, isError)` | 标记执行完成，显示 ✓ 或 ✗ 图标，填入结果文本 |
+| `extractResultText(result)` | 从 result 对象提取纯文本 |
+| `formatArgsSummary()` | 格式化 args 为一行摘要（bash 显示命令，其他显示路径或首参） |
+
+**UI 结构**：
+```
+.pi-chat-tool-call (卡片容器，border + border-radius)
+  ├── .pi-chat-tool-header (可点击，切换展开/收起)
+  │   ├── .pi-chat-tool-status (状态图标：旋转/✓/✗)
+  │   ├── .pi-chat-tool-icon (工具类型图标)
+  │   ├── .pi-chat-tool-name (工具名)
+  │   ├── .pi-chat-tool-args-summary (一行参数摘要)
+  │   └── .pi-chat-tool-toggle (展开/收起箭头)
+  └── .pi-chat-tool-body (可折叠主体)
+        ├── .pi-chat-tool-args-detail (JSON 参数详情)
+        └── .pi-chat-tool-output (执行输出)
+```
+
+**行为**：
+- 创建时默认收起（`.pi-chat-tool-body-collapsed`），有实时输出时自动展开
+- 头部点击切换展开/收起
+- 状态图标三态：旋转动画（执行中）、绿色 ✓（成功）、红色 ✗（失败）
+
+**工具图标映射**（Lucide icons）：
+| 工具 | 图标 |
+|------|------|
+| bash | terminal |
+| read | file-text |
+| edit | pencil |
+| write | file-plus |
+| grep / find | search |
+| defuddle | globe |
+| ls | list |
+| cd | folder |
+
+---
+
+### 7. `src/ui/CommandMenu.ts` — 命令菜单
+
+**职责**：输入框输入 `/` 时弹出命令建议列表，支持键盘导航和鼠标点击。
+
+| 方法 | 说明 |
+|------|------|
+| `setCommands(items)` | 设置可用命令列表（从 `get_commands` 返回的数据填充） |
+| `show(query)` | 按 query（`startsWith`）筛选命令并渲染下拉菜单 |
+| `hide()` | 移除菜单 DOM |
+| `isVisible()` | 菜单是否当前可见 |
+| `handleKeydown(e)` | 键盘导航：↑↓ 切换、Enter 确认、Escape 关闭 |
+
+**数据来源**：pi RPC `get_commands` 命令，返回 extension/ prompt 模板/ skill 三类命令。
+
+**UI 结构**：
+```
+.pi-command-menu (absolute 定位，贴在输入框上方)
+  └── ul.pi-command-list
+        └── li.pi-command-item (.pi-command-item-selected 高亮)
+              ├── .pi-command-icon (source 类型图标)
+              ├── .pi-command-name (带 / 前缀)
+              └── .pi-command-desc (描述文本)
+```
+
+**构造参数**：`(container, textarea, onSelect)`
+- `container`：定位父容器（`.pi-chat-container`）
+- `textarea`：输入框元素（维持焦点）
+- `onSelect`：选中回调，填入 `/命令名 ` 到输入框
+
+---
+
+### 8. `src/utils/helpers.ts` — 工具函数
 
 | 函数 | 说明 |
 |------|------|
@@ -145,7 +250,7 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 
 ---
 
-### 6. `src/settings.ts` — 配置管理
+### 9. `src/settings.ts` — 配置管理
 
 **职责**：定义设置接口、默认值和设置页面 UI。
 
