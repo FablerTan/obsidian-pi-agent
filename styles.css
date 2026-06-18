@@ -150,16 +150,13 @@ If your plugin does not need CSS, delete this file.
     box-sizing: border-box;
 }
 
-/* 欢迎页 — 垂直居中，等宽字体风格，类似终端输出 */
+/* 欢迎页 — 居中显示 */
 .pi-chat-welcome {
     margin: auto;
-    padding: 24px 28px;
-    width: 100%;
-    max-width: 420px;
+    text-align: center;
     color: var(--text-muted);
-    font-family: var(--font-monospace);
-    font-size: 12px;
-    line-height: 1.6;
+    padding: 24px;
+    max-width: 400px;
 }
 
 .pi-welcome-title {
@@ -167,11 +164,10 @@ If your plugin does not need CSS, delete this file.
     align-items: center;
     justify-content: center;
     gap: 8px;
-    font-size: 16px;
+    font-size: var(--font-ui-large);
     font-weight: var(--font-semibold);
     color: var(--text-normal);
-    margin-bottom: 20px;
-    font-family: var(--font-ui);
+    margin-bottom: 16px;
 }
 
 .pi-welcome-logo {
@@ -186,21 +182,21 @@ If your plugin does not need CSS, delete this file.
 .pi-welcome-sections {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
+    text-align: left;
 }
-
-.pi-welcome-block {}
 
 .pi-welcome-block-title {
     color: var(--text-normal);
     font-weight: var(--font-semibold);
+    font-size: var(--font-ui-small);
     margin-top: 4px;
 }
 
 .pi-welcome-block-line {
-    padding-left: 0;
     color: var(--text-muted);
-    white-space: pre;
+    font-size: var(--font-ui-small);
+    padding-left: 8px;
 }
 
 /* ── 顶部横条 ──────────────────────── */
