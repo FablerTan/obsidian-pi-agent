@@ -522,8 +522,9 @@ export class PiChatView extends ItemView {
     // ── 更新选中文本 UI ───────────────────────
     private updateSelectionDisplay(): void {
         if (this.selectedText) {
-            const count = this.selectedText.length;
-            this.selectionInfoEl.setText(`「选中 ${count} 字」`);
+            const charCount = this.selectedText.length;
+            const lineCount = this.selectedText.split('\n').length;
+            this.selectionInfoEl.setText(`「选中 ${lineCount} 行 ${charCount} 字」`);
             this.selectionInfoEl.toggleClass('pi-chat-selection-active', true);
         } else {
             this.selectionInfoEl.setText('');
