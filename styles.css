@@ -468,11 +468,6 @@ If your plugin does not need CSS, delete this file.
     opacity: 0.7;
 }
 
-.pi-reload-none {
-    color: var(--text-faint);
-    font-style: italic;
-    font-size: 11px;
-}
 
 /* markdown 渲染内容的通用样式 */
 .pi-chat-msg-assistant p {

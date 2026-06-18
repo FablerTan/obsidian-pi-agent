@@ -491,11 +491,8 @@ export class PiChatView extends ItemView {
                 // 保存新命令名供下次对比
                 this.previousCmdNames = new Set(cmds.map((c: any) => c.name));
             } else {
-                this.addSystemMessage('refresh-cw', 'Pi 已重载', (el) => {
-                    el.createSpan({ cls: 'pi-reload-none', text: '没有更新' });
-                });
+                this.addSystemMessage('refresh-cw', 'Pi 已重载', () => {});
                 this.loadCommands();
-                // 重置对比基准
                 this.previousCmdNames = new Set();
             }
         } catch {
