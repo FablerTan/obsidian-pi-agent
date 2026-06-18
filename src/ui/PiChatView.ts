@@ -401,13 +401,17 @@ export class PiChatView extends ItemView {
 
 
     // ── 添加系统通知消息 ──────────────────────
-    private addSystemMessage(html: string): void {
+    private addSystemMessage(icon: string, title: string, bodyFn: (el: HTMLElement) => void): void {
         if (this.welcomePage) {
             this.welcomePage.remove();
             this.welcomePage = null as any;
         }
         const msgEl = this.messagesEl.createDiv({ cls: 'pi-chat-msg-system' });
-        msgEl.innerHTML = html;
+        const header = msgEl.createDiv({ cls: 'pi-msg-system-header' });
+        const iconEl = header.createSpan({ cls: 'pi-msg-system-icon' });
+        setIcon(iconEl, icon);
+        header.createSpan({ cls: 'pi-msg-system-title', text: title });
+        bodyFn(msgEl);
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     }
 
@@ -435,26 +439,26 @@ export class PiChatView extends ItemView {
                     if (!groups.has(src)) groups.set(src, []);
                     groups.get(src)!.push(c.name);
                 }
-                // 构建通知消息
-                let html = '<div class="pi-reload-header">🔄 Pi 已重载</div>';
-                const order = ['extension', 'skill', 'prompt'];
-                const labels: Record<string, string> = { extension: '扩展', skill: '技能', prompt: '模板' };
-                for (const key of order) {
-                    const items = groups.get(key);
-                    if (items && items.length > 0) {
-                        html += `<div class="pi-reload-section"><span class="pi-reload-label">${labels[key] || key}</span> <span class="pi-reload-count">${items.length}</span></div>`;
-                        html += '<div class="pi-reload-items">' + items.map(n => `<span class="pi-reload-item">${n}</span>`).join('') + '</div>';
+                // 构建通知消息（DOM API，图标用 setIcon）
+                this.addSystemMessage('refresh-cw', 'Pi 已重载', (el) => {
+                    const order = ['extension', 'skill', 'prompt'];
+                    const labels: Record<string, string> = { extension: '扩展', skill: '技能', prompt: '模板' };
+                    for (const key of order) {
+                        const items = groups.get(key);
+                        if (items && items.length > 0) {
+                            const section = el.createDiv({ cls: 'pi-reload-section' });
+                            section.createSpan({ cls: 'pi-reload-label', text: labels[key] || key });
+                            section.createSpan({ cls: 'pi-reload-count', text: String(items.length) });
+                            const itemsWrap = el.createDiv({ cls: 'pi-reload-items' });
+                            for (const n of items) {
+                                itemsWrap.createSpan({ cls: 'pi-reload-item', text: n });
+                            }
+                        }
+                        groups.delete(key);
                     }
-                    groups.delete(key);
-                }
-                for (const [key, items] of groups) {
-                    if (items.length > 0) {
-                        html += `<div class="pi-reload-section"><span class="pi-reload-label">${key}</span> <span class="pi-reload-count">${items.length}</span></div>`;
-                    }
-                }
-                this.addSystemMessage(html);
+                });
             } else {
-                this.addSystemMessage('<div class="pi-reload-header">🔄 Pi 已重载</div>');
+                this.addSystemMessage('refresh-cw', 'Pi 已重载', () => {});
                 this.loadCommands();
             }
         } catch {

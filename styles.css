@@ -383,10 +383,26 @@ If your plugin does not need CSS, delete this file.
     user-select: text;
 }
 
-.pi-reload-header {
+.pi-msg-system-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.pi-msg-system-icon {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-accent);
+}
+
+.pi-msg-system-title {
     font-weight: var(--font-semibold);
     color: var(--text-normal);
-    margin-bottom: 6px;
+    font-size: var(--font-ui-medium);
 }
 
 .pi-reload-section {
