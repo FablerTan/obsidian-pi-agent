@@ -30,6 +30,7 @@ If your plugin does not need CSS, delete this file.
     padding: 12px;
     display: flex;
     flex-direction: column;
+    user-select: text;
 }
 
 /* 输入框，贴在底部 */
@@ -122,10 +123,11 @@ If your plugin does not need CSS, delete this file.
     border-radius: 8px;
     margin-bottom: 8px;
     max-width: 85%;
-    width: fit-content;        /* ← 宽度跟随内容，短消息不会撑满 */
+    width: fit-content;        /* 宽度跟随内容，短消息不会撑满 */
     margin-left: auto;         /* 用户消息靠右 */
     white-space: pre-wrap;
     word-break: break-word;
+    user-select: text;         /* 允许选中复制 */
 }
 
 .pi-chat-msg-assistant {
@@ -134,7 +136,8 @@ If your plugin does not need CSS, delete this file.
     border-radius: 8px;
     margin-bottom: 8px;
     max-width: 85%;
-    width: fit-content;        /* ← 同上 */
+    width: fit-content;        /* 同上 */
     white-space: pre-wrap;
     word-break: break-word;
+    user-select: text;         /* 允许选中复制 */
 }
