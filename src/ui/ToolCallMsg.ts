@@ -33,7 +33,7 @@ export class ToolCallMsg {
     private outputEl!: HTMLElement;
     private toggleIcon!: HTMLElement;
     private outputPre: HTMLElement | null = null;
-    private state: ViewState = 'limited';  // 默认限制模式
+    private state: ViewState = 'collapsed';  // 默认折叠
     private _hasManyLines = false;          // 输出是否超过5行
 
     constructor(
