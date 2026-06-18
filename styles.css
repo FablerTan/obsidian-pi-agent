@@ -8,12 +8,12 @@ If your plugin does not need CSS, delete this file.
 */
 
 /* ── Pi Chat 面板布局 ──────────────────── */
-/* contentEl 变成 flex 列 */
+/* 用 absolute 撑满父容器，不受父元素 height 计算影响 */
 .pi-chat-wrapper {
+    position: absolute;
+    inset: 0;
     display: flex;
     flex-direction: column;
-    height: 100%;
-    position: relative; /* 给历史浮层做定位基准 */
 }
 
 /* 内容区域（消息列表 + 输入框）占满剩余空间 */
@@ -27,7 +27,6 @@ If your plugin does not need CSS, delete this file.
 
 /* 输入区域容器（命令菜单 + 输入框 + 状态栏），贴底部 */
 .pi-chat-input-area {
-    margin-top: auto;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
