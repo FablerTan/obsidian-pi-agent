@@ -467,6 +467,73 @@ If your plugin does not need CSS, delete this file.
 }
 
 
+/* ── 模型选择下拉列表 ──────────────── */
+.pi-model-picker {
+    max-height: 260px;
+    overflow-y: auto;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.12);
+    margin-bottom: 4px;
+    flex-shrink: 0;
+}
+
+.pi-model-list {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+}
+
+.pi-model-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: var(--font-ui-small);
+}
+
+.pi-model-item:hover {
+    background: var(--background-modifier-hover);
+}
+
+.pi-model-item-current {
+    background: var(--background-modifier-hover);
+}
+
+.pi-model-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-accent);
+}
+
+.pi-model-name {
+    flex: 1;
+    font-weight: var(--font-semibold);
+    color: var(--text-normal);
+}
+
+.pi-model-provider {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.pi-model-check {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-accent);
+}
+
+
 /* ── 工具调用卡片 ──────────────────── */
 /* 工具卡片在助手气泡内部时，与文字之间留间距 */
 .pi-chat-msg-assistant > .pi-chat-tool-wrapper {

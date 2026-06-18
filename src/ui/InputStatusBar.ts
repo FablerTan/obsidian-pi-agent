@@ -1,8 +1,10 @@
-// 输入框底部状态栏：显示当前模型和思考层级，点击即可切换
+// 输入框底部状态栏：显示当前模型和思考层级
+// 点击模型名 → 弹出列表选择模型
+// 点击思考层级 → 循环切换
 import { setIcon, Notice } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 
-// 思考层级缩写映射
+// 思考层级缩写
 const THINKING_LABELS: Record<string, string> = {
     off: 'off',
     minimal: 'min',
@@ -12,32 +14,42 @@ const THINKING_LABELS: Record<string, string> = {
     xhigh: 'xhigh',
 };
 
+// 提供商图标
+const PROVIDER_ICONS: Record<string, string> = {
+    anthropic: 'bot',
+    openai: 'bot',
+    google: 'globe',
+    openrouter: 'globe',
+};
+
 export class InputStatusBar {
     private el: HTMLElement;
+    private modelBtn: HTMLElement;
     private modelNameEl: HTMLElement;
     private thinkingEl: HTMLElement;
+    private dropdownEl: HTMLElement | null = null;
     private state: { modelName: string; thinkingLevel: string } = {
         modelName: '加载中…',
         thinkingLevel: '',
     };
 
     constructor(
-        container: HTMLElement,
+        private container: HTMLElement,      // .pi-chat-container，做下拉定位
         private piClient: PiRpcClient,
     ) {
         this.el = container.createDiv({ cls: 'pi-input-status-bar' });
 
-        // ── 模型（点击切换） ──
-        const modelBtn = this.el.createSpan({ cls: 'pi-status-btn' });
-        const modelIcon = modelBtn.createSpan({ cls: 'pi-status-icon' });
+        // ── 模型（点击弹出选择列表） ──
+        this.modelBtn = this.el.createSpan({ cls: 'pi-status-btn' });
+        const modelIcon = this.modelBtn.createSpan({ cls: 'pi-status-icon' });
         setIcon(modelIcon, 'bot');
-        this.modelNameEl = modelBtn.createSpan({ cls: 'pi-status-label' });
-        modelBtn.addEventListener('click', () => this.cycleModel());
+        this.modelNameEl = this.modelBtn.createSpan({ cls: 'pi-status-label' });
+        this.modelBtn.addEventListener('click', () => this.openModelPicker());
 
         // 间隔
         this.el.createSpan({ cls: 'pi-status-sep', text: '·' });
 
-        // ── 思考层级（点击切换） ──
+        // ── 思考层级（点击循环切换） ──
         const thinkBtn = this.el.createSpan({ cls: 'pi-status-btn' });
         const thinkIcon = thinkBtn.createSpan({ cls: 'pi-status-icon' });
         setIcon(thinkIcon, 'brain');
@@ -46,6 +58,10 @@ export class InputStatusBar {
 
         // 加载初始状态
         this.loadState();
+
+        // 点击其他地方关闭下拉
+        this.el.addEventListener('click', (e) => e.stopPropagation());
+        activeDocument.addEventListener('click', () => this.closeDropdown());
     }
 
     // ── 加载当前状态 ──────────────────────────
@@ -55,14 +71,7 @@ export class InputStatusBar {
             if (resp?.success && resp.data) {
                 this.applyState(resp.data);
             }
-        } catch {
-            // pi 未就绪
-        }
-    }
-
-    // ── 刷新状态（外部调用） ──────────────────
-    async refresh(): Promise<void> {
-        await this.loadState();
+        } catch { /* pi 未就绪 */ }
     }
 
     // ── 应用状态到 UI ─────────────────────────
@@ -80,20 +89,96 @@ export class InputStatusBar {
         this.thinkingEl.setText(label);
     }
 
-    // ── 切换模型 ──────────────────────────────
-    private async cycleModel(): Promise<void> {
+    // ── 弹出模型选择列表 ──────────────────────
+    private async openModelPicker(): Promise<void> {
+        // 如果已经开着就关掉
+        if (this.dropdownEl) {
+            this.closeDropdown();
+            return;
+        }
+
+        let models: any[] = [];
         try {
-            const resp = await this.piClient.sendAndWait({ type: 'cycle_model' });
-            if (resp?.success && resp.data) {
-                this.applyState(resp.data);
-                new Notice(`模型: ${resp.data.model?.name || resp.data.model?.id || ''}`);
+            const resp = await this.piClient.sendAndWait({ type: 'get_available_models' });
+            if (resp?.success && resp.data?.models) {
+                models = resp.data.models;
+            }
+        } catch {
+            new Notice('获取模型列表失败');
+            return;
+        }
+
+        if (models.length === 0) {
+            new Notice('没有可用模型');
+            return;
+        }
+
+        // 创建下拉浮层
+        this.dropdownEl = this.container.createDiv({ cls: 'pi-model-picker' });
+
+        const list = this.dropdownEl.createEl('ul', { cls: 'pi-model-list' });
+
+        for (const model of models) {
+            const li = list.createEl('li', { cls: 'pi-model-item' });
+            const isCurrent = model.name === this.state.modelName || model.id === this.state.modelName;
+            if (isCurrent) li.addClass('pi-model-item-current');
+
+            // 提供商图标
+            const iconSpan = li.createSpan({ cls: 'pi-model-icon' });
+            setIcon(iconSpan, PROVIDER_ICONS[model.provider] || 'bot');
+
+            // 模型名
+            const nameSpan = li.createSpan({ cls: 'pi-model-name', text: model.name || model.id });
+
+            // 提供商标签
+            li.createSpan({ cls: 'pi-model-provider', text: model.provider });
+
+            // 选中标记
+            if (isCurrent) {
+                const checkSpan = li.createSpan({ cls: 'pi-model-check' });
+                setIcon(checkSpan, 'check');
+            }
+
+            li.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.selectModel(model);
+            });
+        }
+
+        // 阻止容器内点击冒泡关闭
+        this.dropdownEl.addEventListener('click', (e) => e.stopPropagation());
+    }
+
+    // ── 选择模型 ──────────────────────────────
+    private async selectModel(model: any): Promise<void> {
+        this.closeDropdown();
+        try {
+            const resp = await this.piClient.sendAndWait({
+                type: 'set_model',
+                provider: model.provider,
+                modelId: model.id,
+            });
+            if (resp?.success) {
+                // set_model 的 data 包含完整的 model 对象
+                this.applyState(resp.data || model);
+                new Notice(`已切换到 ${model.name || model.id}`);
+            } else {
+                new Notice('切换模型失败: ' + (resp?.error || '未知错误'));
             }
         } catch {
             new Notice('切换模型失败');
         }
     }
 
-    // ── 切换思考层级 ──────────────────────────
+    // ── 关闭下拉 ──────────────────────────────
+    private closeDropdown(): void {
+        if (this.dropdownEl) {
+            this.dropdownEl.remove();
+            this.dropdownEl = null;
+        }
+    }
+
+    // ── 循环切换思考层级 ──────────────────────
     private async cycleThinking(): Promise<void> {
         try {
             const resp = await this.piClient.sendAndWait({ type: 'cycle_thinking_level' });
