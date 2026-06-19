@@ -81,7 +81,7 @@
 | `agent_end` | `PiChatView.handlePiEvent()` — 清理状态 + 清除 `isAgentActive` |
 | `compaction_start` | `PiChatView.handlePiEvent()` — 显示「正在压缩…」系统消息 |
 | `compaction_end` | `PiChatView.handlePiEvent()` — 更新消息为完成/取消/失败 |
-| `queue_update` | `PiChatView.handlePiEvent()` — 更新 header 排队指示器 |
+| `queue_update` | `PiChatView.handlePiEvent()` — 更新 header 徽章 + 出队消息还原样式 |
 | `message_update.text_delta` | `PiChatView.handlePiEvent()` — 追加助手文字 |
 | `message_update.toolcall_start` | `PiChatView.handlePiEvent()` — 隐藏加载动画 |
 | `message_update.thinking_start` | `PiChatView.handlePiEvent()` — 创建 ThinkingBlock |

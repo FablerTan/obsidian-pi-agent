@@ -76,6 +76,12 @@ export class PiChatView extends ItemView {
     // 排队队列指示器（在 header 中显示）
     private queueBadgeEl: HTMLElement | null = null;
 
+    // 排队中的用户消息 DOM 元素（按先进先出顺序）
+    private queuedMsgEls: HTMLElement[] = [];
+
+    // 上一次 queue_update 的排队总数，用于计算新出队的消息
+    private prevQueueTotal = 0;
+
     // Extension UI 协议处理器
     private extUiHandler!: ExtensionUIHandler;
 
@@ -202,8 +208,20 @@ export class PiChatView extends ItemView {
 
                 this.addUserMessage(msg);
                 textarea.value = '';
-                this.showLoading();
-                this.piClient.prompt(finalMsg);
+
+                if (this.isAgentActive) {
+                    // AI 正在输出，排队等待（followUp）
+                    // 标记消息为排队状态
+                    const lastMsg = this.messagesEl.querySelector('.pi-chat-msg-user:last-child') as HTMLElement | null;
+                    if (lastMsg) {
+                        lastMsg.addClass('pi-chat-msg-queued');
+                        this.queuedMsgEls.push(lastMsg);
+                    }
+                    this.piClient.send({ type: 'prompt', message: finalMsg, streamingBehavior: 'followUp' });
+                } else {
+                    this.showLoading();
+                    this.piClient.prompt(finalMsg);
+                }
 
                 // 5 秒超时保护
                 this.loadingTimeout = window.setTimeout(() => {
@@ -376,12 +394,27 @@ export class PiChatView extends ItemView {
             }
             case 'queue_update': {
                 const total = (event.steering?.length ?? 0) + (event.followUp?.length ?? 0);
-                if (total > 0 && this.queueBadgeEl) {
-                    this.queueBadgeEl.setText(`${total} 条等待`);
-                    this.queueBadgeEl.hidden = false;
-                } else if (this.queueBadgeEl) {
-                    this.queueBadgeEl.hidden = true;
+                // 更新徽章
+                if (this.queueBadgeEl) {
+                    if (total > 0) {
+                        this.queueBadgeEl.setText(`${total} 条等待`);
+                        this.queueBadgeEl.hidden = false;
+                    } else {
+                        this.queueBadgeEl.hidden = true;
+                        this.queuedMsgEls = [];
+                    }
                 }
+                // 有消息出队 → 取消其排队样式
+                const dequeued = this.prevQueueTotal - total;
+                if (dequeued > 0) {
+                    for (let i = 0; i < dequeued && this.queuedMsgEls.length > 0; i++) {
+                        const el = this.queuedMsgEls.shift();
+                        if (el && this.messagesEl.contains(el)) {
+                            el.removeClass('pi-chat-msg-queued');
+                        }
+                    }
+                }
+                this.prevQueueTotal = total;
                 break;
             }
             case 'compaction_start': {
@@ -528,7 +561,12 @@ export class PiChatView extends ItemView {
         this.currentAssistantEl = null;
         this.thinkingBlock = null;
         this.toolCalls.clear();
-        new Notice('已打断');
+        // 打断后如果有排队的消息，保持其排队样式，等待后续处理
+        if (this.queuedMsgEls.length > 0) {
+            new Notice(`已打断，还有 ${this.queuedMsgEls.length} 条排队消息待处理`);
+        } else {
+            new Notice('已打断');
+        }
     }
 
     // ── 处理 /history ──────────────────────────
