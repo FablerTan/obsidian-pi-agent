@@ -1,92 +1,89 @@
-# Obsidian Sample Plugin
+# Pi Agent — Obsidian 聊天面板插件
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+在 Obsidian 中与 [Pi](https://pi.dev)（终端 AI 编程助手）对话的侧边栏聊天面板。通过 RPC 协议启动 pi 子进程，实现完整的 AI 对话体验。
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## 功能
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
+### 💬 聊天
+- 右侧栏聊天面板，用户消息与 AI 回复以气泡形式展示
+- AI 回复流式逐 token 输出，实时渲染 Markdown
+- 支持思考链折叠展示、工具调用卡片（bash/read/edit 等）
+- Esc 打断 AI 输出
 
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and outputs a Notice on click.
-- Registers a global interval which logs 'setInterval' to the console.
+### 🤖 Pi 集成
+- 插件启动时自动在后台启动 `pi --mode rpc` 子进程
+- 通过 JSONL 协议通信，支持全部 RPC 事件和命令
+- 自动检测 pi 安装路径，支持自定义路径
 
-## First time developing plugins?
+### 🔧 命令系统
+- 输入 `/` 弹出命令菜单，支持任意子串搜索，IME 兼容
+- 内置命令：`/new`（新建会话）、`/reload`（重载扩展）、`/history`（历史会话）、`/compact`（压缩上下文）、`/stats`（Token 统计）
+- 自动发现 pi 扩展注册的自定义命令
 
-Quick starting guide for new plugin devs:
+### 📎 笔记上下文
+- 自动追踪当前打开的笔记名
+- 选中文本自动捕获，显示行数/字数
+- 可切换是否附加笔记路径到消息中
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `src/main.ts` to `main.js`.
-- Make changes to `src/main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+### 🧩 Extension UI 协议
+- 支持 pi 扩展的 `select`/`confirm`/`input`/`editor` 等交互弹窗（内联面板形式）
+- 支持 `notify`/`setStatus`/`setWidget`/`setTitle`/`set_editor_text` 广播
 
-## Releasing new releases
+### 📊 状态栏
+- 显示当前模型（点击切换）、思考层级（点击循环切换）、Token 用量
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+### ⚙️ 设置
+- Pi 路径配置 + 自动检测按钮
+- 自动压缩开关（百分比或 Token 阈值）
+- Skills / Prompts / Extensions 路径配置
+- 所有配置写入项目 `.pi/settings.json`
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+## 安装
 
-## Adding your plugin to the community plugin list
+1. 将 `obsidian-pi-chat` 目录复制到 vault 的 `.obsidian/plugins/` 下
+2. 在 Obsidian 设置中启用「Pi Agent」插件
+3. 确保系统已安装 [Pi](https://pi.dev)（`brew install pi` 或官网下载）
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+## 构建
 
-## How to use
-
-- Clone this repo.
-- Make sure your NodeJS is at least v18 (`node --version`).
-- `npm i` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint
-
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code.
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-	"fundingUrl": "https://buymeacoffee.com"
-}
+```bash
+npm install        # 安装依赖
+npm run build      # 编译为 main.js
+npm run dev        # 监听模式
 ```
 
-If you have multiple URLs, you can also do:
+## 技术栈
 
-```json
-{
-	"fundingUrl": {
-		"Buy Me a Coffee": "https://buymeacoffee.com",
-		"GitHub Sponsor": "https://github.com/sponsors",
-		"Patreon": "https://www.patreon.com/"
-	}
-}
+- **语言**: TypeScript
+- **打包**: esbuild
+- **通信**: child_process.spawn + JSONL RPC
+- **平台**: 仅桌面端（需要 Node.js child_process）
+
+## 项目结构
+
+```
+src/
+├── main.ts              # 插件入口
+├── settings.ts          # 设置接口 + 设置页面
+├── pi/
+│   └── rpc-client.ts    # pi RPC 客户端
+├── ui/
+│   ├── PiChatView.ts    # 聊天面板核心
+│   ├── CommandMenu.ts   # / 命令菜单
+│   ├── ExtensionUIHandler.ts  # 扩展 UI 协议
+│   ├── InputStatusBar.ts      # 底部状态栏
+│   ├── NoteBar.ts       # 笔记栏
+│   ├── MarkdownMsg.ts   # Markdown 渲染
+│   ├── ThinkingBlock.ts # 思考链组件
+│   ├── ToolCallMsg.ts   # 工具调用卡片
+│   ├── HistoryPanel.ts  # 历史会话
+│   └── WelcomePage.ts   # 欢迎页
+└── utils/
+    ├── helpers.ts       # 工具函数
+    ├── detect-pi.ts     # pi 路径检测
+    └── pi-settings.ts   # .pi/settings.json 读写
 ```
 
-## API Documentation
+## 许可证
 
-See https://docs.obsidian.md
+MIT

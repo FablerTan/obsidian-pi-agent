@@ -4,7 +4,7 @@
 	"version": "1.0.0",
 	"minAppVersion": "1.0.0",
 	"description": "在 Obsidian 中和 Pi（终端 AI 编程助手）聊天的面板插件",
-	"author": "Your Name",
-	"authorUrl": "",
+	"author": "fabler",
+	"authorUrl": "https://github.com/fabler",
 	"isDesktopOnly": true
 }
