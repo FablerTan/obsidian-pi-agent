@@ -53,16 +53,23 @@ export class PiRpcClient {
                 console.error('pi stderr:', chunk.toString());
             });
 
-            // 监听进程退出（用局部引用判断，避免旧进程退出时覆盖新进程）
+            // spawn 错误：可执行文件不存在或权限不足
+            proc.on('error', (err) => {
+                console.error('pi spawn error:', err.message);
+                if (this.proc === proc) {
+                    this.proc = null;
+                }
+                reject(new Error(`无法启动 pi (${piPath}): ${err.message}`));
+            });
+
+            // 监听进程退出
             proc.on('exit', (code) => {
                 console.log(`pi exited with code ${code}`);
-                // 只有 this.proc 仍然指向当前进程时，才清空它
-                // 防止 restart() 中旧进程的 exit 异步触发覆盖新进程
                 if (this.proc === proc) {
                     this.proc = null;
                 }
                 if (code !== 0) {
-                    reject(new Error(`pi exited with code ${code}`));
+                    reject(new Error(`pi 异常退出 (code ${code})`));
                 }
             });
 
