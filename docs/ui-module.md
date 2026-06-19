@@ -353,3 +353,45 @@ pi 进程 → stdout (extension_ui_request) → rpc-client.handleEvent()
 
 - 构造：`onOpen()` 中实例化，传入 `app`、`piClient`、`textarea`
 - 销毁：`onClose()` 中调用 `destroy()` 移除 DOM 元素
+
+---
+
+## 11. 测试扩展 — `.pi/extensions/test-ext-ui.ts`
+
+用于手动验证 Extension UI 协议的 Pi 扩展，覆盖全部 9 个方法。
+
+### 注册命令
+
+| 命令 | 测试内容 |
+|------|----------|
+| `/test-ui` | 全流程：select → confirm → input → editor |
+| `/test-select` | select 弹窗 |
+| `/test-confirm` | confirm 弹窗 |
+| `/test-input` | input 弹窗 |
+| `/test-editor` | editor 弹窗 |
+| `/test-prefill` | setEditorText（预设输入框） |
+| `/test-notify` | 三种通知类型 info/warning/error |
+| `/test-status` | setStatus 设置/清除状态栏 |
+| `/test-widget` | setWidget 设置/清除部件 |
+| `/test-title` | setTitle 修改窗口标题 |
+
+### 自动触发场景
+
+| 场景 | 触发的方法 |
+|------|-----------|
+| `/new` 新建会话 | confirm（确认是否清空） |
+| LLM 调用 `rm -rf` 等危险命令 | select（选择放行/拦截） |
+| 会话启动 | setTitle + setWidget + setStatus |
+| turn 开始/结束 | setStatus 更新 |
+| `/reload` 热重载 | notify（info 类型） |
+
+### 使用方法
+
+```bash
+# 确保扩展被加载
+pi --mode rpc --extension .pi/extensions/test-ext-ui.ts
+
+# 或在终端 pi 中
+/reload
+/test-ui
+```

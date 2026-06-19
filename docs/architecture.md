@@ -43,3 +43,9 @@ docs/
 | [`docs/utils-and-settings.md`](utils-and-settings.md) | 工具函数 `helpers.ts` + 配置管理 `settings.ts` |
 | [`docs/known-issues.md`](known-issues.md) | 已知 Bug、安全性问题、功能缺陷 |
 | [`docs/rpc-gaps.md`](rpc-gaps.md) | Pi RPC 协议未处理清单 |
+
+## 测试资源
+
+| 文件 | 说明 |
+|------|------|
+| `.pi/extensions/test-ext-ui.ts` | Extension UI 协议测试扩展，覆盖全部 9 个方法 |
