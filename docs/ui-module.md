@@ -96,7 +96,7 @@
 
 ### 安全机制
 
-1. **IME 兼容**：检查 `e.isComposing`，组词期间不拦截 Enter
+1. **IME 兼容**：检查 `e.isComposing`，组词期间不拦截 Enter；输入 `/` 命令时忽略 IME 拼音音节间的空格，不误藏命令菜单
 2. **打断**：AI 输出时按 Escape 发送 `abort`
 3. **超时保护**：5 秒无回复移除 loading
 
@@ -258,7 +258,7 @@
 | 方法 | 说明 |
 |------|------|
 | `setCommands(items)` | 设置可用命令列表 |
-| `show(query)` | 按任意连续子串筛选并渲染 |
+| `show(query)` | 按任意连续子串筛选并渲染（IME 组合期间忽略拼音空格） |
 | `hide()` | 移除菜单 |
 | `isVisible()` | 菜单是否可见 |
 | `handleKeydown(e)` | 键盘导航 |

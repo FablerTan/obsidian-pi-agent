@@ -136,10 +136,17 @@ export class PiChatView extends ItemView {
         });
 
         // 输入变化时检测 / 命令
-        textarea.addEventListener('input', () => {
+        // 中文输入法（IME）组合期间，拼音音节间的空格是输入法缓冲区的一部分，
+        // 不是命令和参数的分隔符，因此组合期间忽略空格，取空格前的文字作为检索词
+        textarea.addEventListener('input', (e: Event) => {
             const val = textarea.value;
-            if (val.startsWith('/') && !val.includes(' ')) {
-                const query = val.slice(1);
+            const ie = e as InputEvent;
+            if (val.startsWith('/') && (!val.includes(' ') || ie.isComposing)) {
+                let query = val.slice(1);
+                // IME 组合期间拼音可能有空格，例如 "zhong wen" → 取 "zhong" 作为检索词
+                if (ie.isComposing && query.includes(' ')) {
+                    query = query.split(' ')[0] || query;
+                }
                 this.commandMenu.show(query);
             } else {
                 this.commandMenu.hide();
