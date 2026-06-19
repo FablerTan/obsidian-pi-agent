@@ -150,6 +150,8 @@ export class PiChatView extends ItemView {
                 this.handleHistory();
             } else if (cmd.name === 'compact') {
                 this.handleCompact();
+            } else if (cmd.name === 'stats') {
+                this.handleStats();
             } else {
                 textarea.value = '/' + cmd.name + ' ';
                 textarea.focus();
@@ -475,6 +477,7 @@ export class PiChatView extends ItemView {
                     { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
                     { name: 'history', description: '历史会话', source: 'extension' as const },
                     { name: 'compact', description: '压缩会话上下文', source: 'extension' as const },
+                    { name: 'stats', description: '查看 Token 用量统计', source: 'extension' as const },
                 ];
                 const cmds: any[] = resp.data.commands;
                 const allCmds = [...builtins, ...cmds];
@@ -539,6 +542,45 @@ export class PiChatView extends ItemView {
         this.textarea.value = '';
         this.piClient.send({ type: 'compact' });
         new Notice('正在压缩会话…');
+    }
+
+    // ── 处理 /stats ────────────────────────────
+    private async handleStats(): Promise<void> {
+        this.commandMenu.hide();
+        this.textarea.value = '';
+        try {
+            const resp = await this.piClient.getSessionStats();
+            if (!resp?.success || !resp?.data) {
+                new Notice('获取统计失败');
+                return;
+            }
+            const d = resp.data;
+            const tokens = d.tokens || {};
+            const cost = d.cost;
+            const ctx = d.contextUsage;
+
+            const lines: string[] = [];
+            lines.push(`消息: ${d.totalMessages} 条（用户 ${d.userMessages} / 助手 ${d.assistantMessages}）`);
+            if (d.toolCalls) lines.push(`工具调用: ${d.toolCalls} 次`);
+            lines.push('');
+            lines.push(`输入 Token: ${(tokens.input ?? 0).toLocaleString()}`);
+            lines.push(`输出 Token: ${(tokens.output ?? 0).toLocaleString()}`);
+            if (tokens.cacheRead) lines.push(`缓存读取: ${tokens.cacheRead.toLocaleString()}`);
+            if (tokens.cacheWrite) lines.push(`缓存写入: ${tokens.cacheWrite.toLocaleString()}`);
+            lines.push(`总计 Token: ${(tokens.total ?? 0).toLocaleString()}`);
+            if (cost != null) lines.push(`费用: $${cost.toFixed(4)}`);
+            if (ctx) {
+                const pct = ctx.percent != null ? `${ctx.percent}%` : '—';
+                lines.push('');
+                lines.push(`上下文: ${(ctx.tokens ?? 0).toLocaleString()} / ${ctx.contextWindow.toLocaleString()} (${pct})`);
+            }
+
+            this.addSystemMessage('bar-chart', '会话统计', (el) => {
+                el.setText(lines.join('\n'));
+            });
+        } catch {
+            new Notice('获取统计失败');
+        }
     }
 
 
@@ -617,6 +659,7 @@ export class PiChatView extends ItemView {
             { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
             { name: 'history', description: '历史会话', source: 'extension' as const },
             { name: 'compact', description: '压缩会话上下文', source: 'extension' as const },
+            { name: 'stats', description: '查看 Token 用量统计', source: 'extension' as const },
             ...cmds,
         ]);
         // 按 source 分组

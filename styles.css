@@ -430,6 +430,7 @@ If your plugin does not need CSS, delete this file.
 .pi-msg-system-body {
     border-top: 1px solid var(--background-modifier-border);
     padding: 8px 10px;
+    white-space: pre-line;
 }
 
 .pi-reload-section {

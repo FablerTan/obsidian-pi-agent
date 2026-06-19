@@ -128,6 +128,11 @@ export class PiRpcClient {
         return this.send({ type: 'extension_ui_response', id, ...data }) !== null;
     }
 
+    // ── 获取会话统计（token 用量、费用等） ─────
+    getSessionStats(): Promise<any> {
+        return this.sendAndWait({ type: 'get_session_stats' });
+    }
+
     // ── 快捷发送 prompt ─────────────────────────
     prompt(message: string): void {
         this.send({ type: 'prompt', message });
