@@ -73,6 +73,9 @@ export class PiChatView extends ItemView {
     // 压缩状态的系统消息元素（用于更新而不是重复添加）
     private compactionMsgEl: HTMLElement | null = null;
 
+    // 排队队列指示器（在 header 中显示）
+    private queueBadgeEl: HTMLElement | null = null;
+
     // Extension UI 协议处理器
     private extUiHandler!: ExtensionUIHandler;
 
@@ -104,6 +107,9 @@ export class PiChatView extends ItemView {
         const iconEl = header.createSpan({ cls: 'pi-chat-header-icon' });
         setIcon(iconEl, 'pi-logo');
         header.createSpan({ cls: 'pi-chat-header-title', text: 'Pi' });
+        // 排队队列指示器（有排队消息时显示）
+        this.queueBadgeEl = header.createSpan({ cls: 'pi-chat-queue-badge' });
+        this.queueBadgeEl.hidden = true;
 
         // 内容区域（消息列表 + 输入框）
         const container = contentEl.createDiv({ cls: 'pi-chat-container' });
@@ -366,6 +372,16 @@ export class PiChatView extends ItemView {
                 this.thinkingBlock = null;
                 this.toolCalls.clear();
                 new Notice('Pi 返回了错误');
+                break;
+            }
+            case 'queue_update': {
+                const total = (event.steering?.length ?? 0) + (event.followUp?.length ?? 0);
+                if (total > 0 && this.queueBadgeEl) {
+                    this.queueBadgeEl.setText(`${total} 条等待`);
+                    this.queueBadgeEl.hidden = false;
+                } else if (this.queueBadgeEl) {
+                    this.queueBadgeEl.hidden = true;
+                }
                 break;
             }
             case 'compaction_start': {

@@ -35,6 +35,6 @@
 
 详见 `docs/rpc-gaps.md`，按优先级：
 - ~~P0 Extension UI 协议~~ ✅ 已完成（`ExtensionUIHandler.ts`、`test-ext-ui.ts`）
-- P1 多个重要事件（`turn_start/end`、`message_start/end`、`queue_update`、`auto_retry_*`、`message_update` 子事件等）被静默丢弃
+- P1 多个重要事件（`turn_start/end`、`message_start/end`、`auto_retry_*`、`message_update` 子事件等）被静默丢弃
 - P2 多条命令（`compact`、`get_session_stats`、`steer`/`follow_up` 等）从未使用
 - P3 锦上添花（`fork`/`clone`、`bash`、`export_html` 等）

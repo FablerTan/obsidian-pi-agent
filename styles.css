@@ -324,6 +324,17 @@ If your plugin does not need CSS, delete this file.
     color: var(--text-muted);
 }
 
+/* ── 排队队列指示器 ────────────────── */
+.pi-chat-queue-badge {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-on-accent);
+    background: var(--interactive-accent);
+    padding: 1px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
 /* ── 加载动画 ──────────────────────── */
 .pi-chat-loading {
     display: flex;
@@ -1176,12 +1187,12 @@ If your plugin does not need CSS, delete this file.
 /* 状态栏 */
 .pi-ext-status-bar {
     display: flex;
-    gap: 12px;
-    padding: 2px 8px;
+    gap: 16px;
+    padding: 4px 16px;
     font-size: 11px;
     color: var(--text-muted);
     background: var(--background-secondary);
-    border-top: 1px solid var(--background-modifier-border);
+    border-bottom: 1px solid var(--background-modifier-border);
     flex-wrap: wrap;
 }
 

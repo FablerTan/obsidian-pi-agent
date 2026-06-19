@@ -84,6 +84,7 @@
 | `agent_end` | 清理状态 + 清除 `isAgentActive` |
 | `compaction_start` | 显示「正在压缩…」系统消息 |
 | `compaction_end` | 更新消息为完成/取消/失败（含释放 token 数） |
+| `queue_update` | 更新 header 排队指示器（steering/followUp 条数） |
 | `error` / `extension_error` | 显示 Notice |
 
 **未处理的事件**（被静默丢弃）：详见 `docs/rpc-gaps.md`
