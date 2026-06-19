@@ -367,12 +367,11 @@ export class PiChatView extends ItemView {
             }
             case 'agent_start': {
                 this.isAgentActive = true;
-                // 出队第一条排队消息，还原正常样式
+                // 备用：新 agent 开始时也尝试还原第一条排队消息
                 const nextMsg = this.queuedMsgEls.shift();
                 if (nextMsg && this.messagesEl.contains(nextMsg)) {
                     nextMsg.removeClass('pi-chat-msg-queued');
                 }
-                // 确保加载动画显示（如果还未显示）
                 if (!this.loadingEl) {
                     this.showLoading();
                 }
@@ -380,6 +379,13 @@ export class PiChatView extends ItemView {
             }
             case 'agent_end': {
                 this.isAgentActive = false;
+                // 上一轮对话结束，还原所有排队消息为正常样式
+                for (const el of this.queuedMsgEls) {
+                    if (el && this.messagesEl.contains(el)) {
+                        el.removeClass('pi-chat-msg-queued');
+                    }
+                }
+                this.queuedMsgEls = [];
                 this.currentMarkdown = null;
                 this.currentAssistantEl = null;
                 this.thinkingBlock = null;
