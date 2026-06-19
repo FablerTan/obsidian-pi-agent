@@ -224,6 +224,8 @@ export class PiChatView extends ItemView {
 
         // ── 底部状态栏（模型 + 思考层级） ──
         this.inputStatusBar = new InputStatusBar(inputArea, this.piClient);
+        // 首次加载 Token 用量
+        this.inputStatusBar.updateContextUsage();
 
         this.messagesEl = messagesEl;
 
@@ -364,6 +366,8 @@ export class PiChatView extends ItemView {
                 this.currentAssistantEl = null;
                 this.thinkingBlock = null;
                 this.toolCalls.clear();
+                // 更新底部 Token 用量
+                this.inputStatusBar.updateContextUsage();
                 break;
             }
             case 'extension_error':

@@ -739,6 +739,13 @@ If your plugin does not need CSS, delete this file.
     margin: 0 2px;
 }
 
+.pi-status-context {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
 
 /* ── 模型选择下拉列表（fixed 悬浮在按钮上方） ── */
 .pi-model-picker {

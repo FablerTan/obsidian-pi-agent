@@ -27,6 +27,7 @@ export class InputStatusBar {
     private modelBtn: HTMLElement;
     private modelNameEl: HTMLElement;
     private thinkingEl: HTMLElement;
+    private contextEl: HTMLElement;
     private dropdownEl: HTMLElement | null = null;
     private state: { modelName: string; thinkingLevel: string } = {
         modelName: '加载中…',
@@ -58,6 +59,12 @@ export class InputStatusBar {
         setIcon(thinkIcon, 'brain');
         this.thinkingEl = thinkBtn.createSpan({ cls: 'pi-status-label' });
         thinkBtn.addEventListener('click', () => this.cycleThinking());
+
+        // 间隔
+        this.el.createSpan({ cls: 'pi-status-sep', text: '·' });
+
+        // ── Token 用量 ──
+        this.contextEl = this.el.createSpan({ cls: 'pi-status-context', text: '—' });
 
         // 加载初始状态
         this.loadState();
@@ -191,6 +198,28 @@ export class InputStatusBar {
         if (this.dropdownEl) {
             this.dropdownEl.remove();
             this.dropdownEl = null;
+        }
+    }
+
+    // ── 更新 Token 用量显示 ───────────────────
+    async updateContextUsage(): Promise<void> {
+        try {
+            const resp = await this.piClient.getSessionStats();
+            if (!resp?.success || !resp?.data) return;
+            const ctx = resp.data.contextUsage;
+            if (!ctx) {
+                this.contextEl.setText('—');
+                return;
+            }
+            const pct = ctx.percent != null ? `${ctx.percent.toFixed(1)}%` : '?';
+            const window_ = ctx.contextWindow >= 1_000_000
+                ? `${(ctx.contextWindow / 1_000_000).toFixed(1)}M`
+                : ctx.contextWindow >= 1_000
+                    ? `${(ctx.contextWindow / 1_000).toFixed(0)}K`
+                    : `${ctx.contextWindow}`;
+            this.contextEl.setText(`${pct}/${window_}`);
+        } catch {
+            // 忽略错误，保持上次显示
         }
     }
 
