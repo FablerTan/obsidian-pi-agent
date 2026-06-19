@@ -3,11 +3,11 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import PiChatPlugin from './main';
 
 export interface PiChatSettings {
-	mySetting: string;
+	piPath: string;
 }
 
 export const DEFAULT_SETTINGS: PiChatSettings = {
-	mySetting: 'default',
+	piPath: '/opt/homebrew/bin/pi',
 };
 
 export class PiChatSettingTab extends PluginSettingTab {
@@ -22,16 +22,19 @@ export class PiChatSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
+		containerEl.createEl('h2', { text: 'Pi Agent 设置' });
+
 		new Setting(containerEl)
-			.setName('Settings #1')
-			.setDesc("It's a secret")
+			.setName('Pi 可执行文件路径')
+			.setDesc('pi 命令的完整路径。修改后需要重启 Obsidian 或重新加载插件。')
 			.addText((text) =>
 				text
-					.setPlaceholder('Enter your secret')
-					.setValue(this.plugin.settings.mySetting)
+					.setPlaceholder('/opt/homebrew/bin/pi')
+					.setValue(this.plugin.settings.piPath)
 					.onChange(async (value) => {
-						this.plugin.settings.mySetting = value;
+						this.plugin.settings.piPath = value || '/opt/homebrew/bin/pi';
 						await this.plugin.saveSettings();
+						this.plugin.updatePiPath();
 					}),
 			);
 	}

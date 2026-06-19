@@ -5,6 +5,9 @@ export class PiRpcClient {
     // pi 子进程的引用，启动后才有值
     private proc: ChildProcess | null = null;
 
+    // pi 可执行文件路径
+    private piPath = '/opt/homebrew/bin/pi';
+
     // 接收 stdout 数据的缓冲区（数据是一块块到的，要拼成完整行再解析）
     private buffer = '';
 
@@ -19,13 +22,17 @@ export class PiRpcClient {
     // 自增 ID 计数器
     private requestIdCounter = 0;
 
+    // ── 设置 pi 路径 ────────────────────────────
+    setPiPath(path: string): void {
+        this.piPath = path;
+    }
+
     // ── 启动 pi 子进程（异步，等 pi 准备好后 resolve） ─
     start(cwd: string): Promise<void> {
         this.cwd = cwd;
         console.log(`Starting pi RPC in ${cwd}`);
 
-        // pi 的完整路径（macOS Homebrew 安装路径）
-        const piPath = '/opt/homebrew/bin/pi';
+        const piPath = this.piPath;
 
         // 保存局部引用，用于 exit 处理器判断是否还是同一个进程
         const proc = spawn(piPath, ['--mode', 'rpc'], {

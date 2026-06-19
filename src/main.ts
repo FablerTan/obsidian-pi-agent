@@ -25,6 +25,7 @@ export default class PiChatPlugin extends Plugin {
 
 		// 启动 pi RPC 客户端（后台连接 pi 进程）
 		this.piClient = new PiRpcClient();
+		this.piClient.setPiPath(this.settings.piPath);
 		const vaultPath = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
 		this.piClient.start(vaultPath).catch((err) => {
 			new Notice('Pi 启动失败: ' + err.message);
@@ -89,5 +90,13 @@ export default class PiChatPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	// 更新 pi 路径并重启进程
+	updatePiPath(): void {
+		this.piClient?.setPiPath(this.settings.piPath);
+		this.piClient?.restart().catch((err) => {
+			new Notice('Pi 重启失败: ' + err.message);
+		});
 	}
 }
