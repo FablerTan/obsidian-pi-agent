@@ -137,6 +137,21 @@ export class PiChatSettingTab extends PluginSettingTab {
 				);
 		}
 
+		// ── 保存按钮 ──
+		new Setting(containerEl)
+			.setName('写入设置文件')
+			.setDesc('将当前设置写入项目 .pi/settings.json。')
+			.addButton((btn) =>
+				btn
+					.setButtonText('保存')
+					.setCta()
+					.onClick(() => {
+						this.saveCompactionThresholds();
+						this.saveResourcePaths();
+						new Notice('已写入 ' + (this.projectPath || '') + '/.pi/settings.json');
+					}),
+			);
+
 		// ── 自动压缩开关 + 阈值 ──
 		new Setting(containerEl)
 			.setName('自动压缩')
