@@ -202,6 +202,10 @@ export class PiChatView extends ItemView {
                     new Notice('请等待当前回复完成后再发送');
                     return;
                 }
+                if (this.isCompacting) {
+                    new Notice('正在压缩会话，请稍候…');
+                    return;
+                }
 
                 this.addUserMessage(msg);
                 textarea.value = '';
