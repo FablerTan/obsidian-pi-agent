@@ -2,13 +2,16 @@
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import PiChatPlugin from './main';
 import { detectPiPath } from './utils/detect-pi';
-import { readCompactionSettings, writeCompactionSettings } from './utils/pi-settings';
+import { readCompactionSettings, writeCompactionSettings, readResourcePaths, writeResourcePaths } from './utils/pi-settings';
 
 export interface PiChatSettings {
 	piPath: string;
 	autoCompaction: boolean;
 	compactionMode: 'token' | 'percent';
 	compactionPercent: number;
+	skillPaths: string;
+	promptPaths: string;
+	extensionPaths: string;
 }
 
 export const DEFAULT_SETTINGS: PiChatSettings = {
@@ -16,6 +19,9 @@ export const DEFAULT_SETTINGS: PiChatSettings = {
 	autoCompaction: true,
 	compactionMode: 'token',
 	compactionPercent: 80,
+	skillPaths: '',
+	promptPaths: '',
+	extensionPaths: '',
 };
 
 export class PiChatSettingTab extends PluginSettingTab {
@@ -26,8 +32,9 @@ export class PiChatSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	// 当前显示的值（从 pi settings.json 读取，不存插件设置）
+		// 从 pi settings.json 读取的实时值
 	private compactionThresholds = readCompactionSettings();
+	private resourcePaths = readResourcePaths();
 
 	display(): void {
 		const { containerEl } = this;
@@ -67,8 +74,54 @@ export class PiChatSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		// ── 资源路径 ──
+		containerEl.createEl('h3', { text: '资源路径' });
+		containerEl.createEl('p', {
+			text: '配置自定义的技能、模板和扩展路径。路径相对于 ~/.pi/agent，支持绝对路径和 ~。多个路径用逗号分隔。',
+			cls: 'pi-settings-desc',
+		});
+
+		new Setting(containerEl)
+			.setName('技能路径 (skills)')
+			.addText((text) =>
+				text
+					.setPlaceholder('.pi/skills')
+					.setValue(this.plugin.settings.skillPaths)
+					.onChange(async (value) => {
+						this.plugin.settings.skillPaths = value;
+						await this.plugin.saveSettings();
+						this.saveResourcePaths();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('模板路径 (prompts)')
+			.addText((text) =>
+				text
+					.setPlaceholder('.pi/prompts')
+					.setValue(this.plugin.settings.promptPaths)
+					.onChange(async (value) => {
+						this.plugin.settings.promptPaths = value;
+						await this.plugin.saveSettings();
+						this.saveResourcePaths();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('扩展路径 (extensions)')
+			.addText((text) =>
+				text
+					.setPlaceholder('.pi/extensions')
+					.setValue(this.plugin.settings.extensionPaths)
+					.onChange(async (value) => {
+						this.plugin.settings.extensionPaths = value;
+						await this.plugin.saveSettings();
+						this.saveResourcePaths();
+					}),
+			);
+
 		// ── 自动压缩开关 + 阈值 ──
-		const compactionSetting = new Setting(containerEl)
+		new Setting(containerEl)
 			.setName('自动压缩')
 			.setDesc('上下文接近上限时自动压缩，释放 token 空间。')
 			.addToggle((toggle) =>
@@ -153,6 +206,16 @@ export class PiChatSettingTab extends PluginSettingTab {
 						}),
 					);
 		}
+	}
+
+	// ── 写入资源路径到 pi settings.json ──
+	private saveResourcePaths(): void {
+		const toArray = (v: string) => v.split(',').map(s => s.trim()).filter(Boolean);
+		writeResourcePaths({
+			skills: toArray(this.plugin.settings.skillPaths),
+			prompts: toArray(this.plugin.settings.promptPaths),
+			extensions: toArray(this.plugin.settings.extensionPaths),
+		});
 	}
 
 	// ── 按当前模式计算并写入 pi 的 settings.json ──
