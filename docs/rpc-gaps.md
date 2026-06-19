@@ -12,7 +12,7 @@
 |------|------|--------|
 | `steer` | AI 正在输出时插入引导消息（`streamingBehavior: "steer"`） | ⭐ 高 |
 | `follow_up` | AI 完成后才发送的后续消息（`streamingBehavior: "followUp"`） | ⭐ 高 |
-| `compact` | 手动压缩对话上下文 | ⭐ 高 |
+| ~~`compact`~~ | ~~手动压缩对话上下文~~ | ✅ 已实现 `/compact` |
 | `set_auto_compaction` | 开启/关闭自动压缩 | ⭐ 高 |
 | `get_session_stats` | 获取 token 用量、费用、上下文窗口 | ⭐ 高 |
 | `bash` | 直接执行 shell 命令并加入对话上下文（非 LLM 工具调用） | 中 |
@@ -43,6 +43,7 @@
 | `set_model` | `InputStatusBar.ts` — `selectModel()` |
 | `get_available_models` | `InputStatusBar.ts` — `openModelPicker()` |
 | `cycle_thinking_level` | `InputStatusBar.ts` — `cycleThinking()` |
+| `compact` | `PiChatView.ts` — `handleCompact()` |
 
 ---
 

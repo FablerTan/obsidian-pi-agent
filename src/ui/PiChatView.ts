@@ -146,6 +146,8 @@ export class PiChatView extends ItemView {
                 this.handleReload();
             } else if (cmd.name === 'history') {
                 this.handleHistory();
+            } else if (cmd.name === 'compact') {
+                this.handleCompact();
             } else {
                 textarea.value = '/' + cmd.name + ' ';
                 textarea.focus();
@@ -460,6 +462,7 @@ export class PiChatView extends ItemView {
                     { name: 'new', description: '新建会话', source: 'extension' as const },
                     { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
                     { name: 'history', description: '历史会话', source: 'extension' as const },
+                    { name: 'compact', description: '压缩会话上下文', source: 'extension' as const },
                 ];
                 const cmds: any[] = resp.data.commands;
                 const allCmds = [...builtins, ...cmds];
@@ -515,6 +518,14 @@ export class PiChatView extends ItemView {
         this.commandMenu.hide();
         this.textarea.value = '';
         this.historyPanel.open();
+    }
+
+    // ── 处理 /compact ───────────────────────────
+    private handleCompact(): void {
+        this.commandMenu.hide();
+        this.textarea.value = '';
+        this.piClient.send({ type: 'compact' });
+        new Notice('正在压缩会话…');
     }
 
 
@@ -592,6 +603,7 @@ export class PiChatView extends ItemView {
             { name: 'new', description: '新建会话', source: 'extension' as const },
             { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
             { name: 'history', description: '历史会话', source: 'extension' as const },
+            { name: 'compact', description: '压缩会话上下文', source: 'extension' as const },
             ...cmds,
         ]);
         // 按 source 分组
