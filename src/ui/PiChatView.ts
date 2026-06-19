@@ -64,6 +64,9 @@ export class PiChatView extends ItemView {
     // reload 进行中标志，防止重复触发
     private isReloading = false;
 
+    // 当前 AI 是否正在处理请求
+    private isAgentActive = false;
+
     // Extension UI 协议处理器
     private extUiHandler!: ExtensionUIHandler;
 
@@ -167,7 +170,7 @@ export class PiChatView extends ItemView {
                 const handled = this.commandMenu.handleKeydown(e);
                 if (handled) return;
             }
-            if (e.key === 'Escape' && (this.loadingEl || this.currentMarkdown || this.thinkingBlock || this.toolCalls.size > 0)) {
+            if (e.key === 'Escape' && this.isAgentActive) {
                 e.preventDefault();
                 this.abort();
                 return;
@@ -331,7 +334,16 @@ export class PiChatView extends ItemView {
                 }
                 break;
             }
+            case 'agent_start': {
+                this.isAgentActive = true;
+                // 确保加载动画显示（如果还未显示）
+                if (!this.loadingEl) {
+                    this.showLoading();
+                }
+                break;
+            }
             case 'agent_end': {
+                this.isAgentActive = false;
                 this.currentMarkdown = null;
                 this.currentAssistantEl = null;
                 this.thinkingBlock = null;
@@ -421,6 +433,7 @@ export class PiChatView extends ItemView {
         this.commandMenu.hide();
         this.piClient.send({ type: 'abort' });
         this.hideLoading();
+        this.isAgentActive = false;
         this.currentMarkdown = null;
         this.currentAssistantEl = null;
         this.thinkingBlock = null;

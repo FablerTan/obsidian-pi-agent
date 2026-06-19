@@ -80,7 +80,8 @@
 | `tool_execution_start` | 创建 ToolCallMsg 卡片 |
 | `tool_execution_update` | 更新执行输出 |
 | `tool_execution_end` | 标记完成/失败 |
-| `agent_end` | 清理状态 |
+| `agent_start` | 设置 `isAgentActive` + 确保加载动画 |
+| `agent_end` | 清理状态 + 清除 `isAgentActive` |
 | `error` / `extension_error` | 显示 Notice |
 
 **未处理的事件**（被静默丢弃）：详见 `docs/rpc-gaps.md`
