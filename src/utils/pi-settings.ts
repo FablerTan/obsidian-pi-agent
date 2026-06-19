@@ -1,10 +1,6 @@
-// ── 读写 Pi 的 settings.json ──────────────────
+// ── 读写项目 .pi/settings.json ────────────────
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
-
-// 全局设置（~/.pi/agent/settings.json）：压缩阈值等用户级配置
-const GLOBAL_SETTINGS_PATH = path.join(os.homedir(), '.pi', 'agent', 'settings.json');
 
 export interface PiCompactionSettings {
 	reserveTokens: number;
@@ -29,9 +25,9 @@ function writeFullSettings(settingsPath: string, json: Record<string, any>): voi
 	fs.writeFileSync(settingsPath, JSON.stringify(json, null, 2) + '\n', 'utf-8');
 }
 
-/** 读取压缩阈值设置。优先读项目 .pi/settings.json，没有则读全局 */
-export function readCompactionSettings(projectPath?: string): PiCompactionSettings {
-	const path_ = projectPath ? path.join(projectPath, '.pi', 'settings.json') : GLOBAL_SETTINGS_PATH;
+/** 读取项目 .pi/settings.json 中的压缩阈值，没有则返回默认值 */
+export function readCompactionSettings(projectPath: string): PiCompactionSettings {
+	const path_ = path.join(projectPath, '.pi', 'settings.json');
 	const json = readFullSettings(path_);
 	const c = json.compaction || {};
 	return {
@@ -40,9 +36,9 @@ export function readCompactionSettings(projectPath?: string): PiCompactionSettin
 	};
 }
 
-/** 写入压缩阈值到项目 .pi/settings.json（如果没传 projectPath 则写入全局） */
-export function writeCompactionSettings(settings: PiCompactionSettings, projectPath?: string): void {
-	const path_ = projectPath ? path.join(projectPath, '.pi', 'settings.json') : GLOBAL_SETTINGS_PATH;
+/** 写入压缩阈值到项目 .pi/settings.json */
+export function writeCompactionSettings(settings: PiCompactionSettings, projectPath: string): void {
+	const path_ = path.join(projectPath, '.pi', 'settings.json');
 	const json = readFullSettings(path_);
 	json.compaction = { ...json.compaction, ...settings };
 	writeFullSettings(path_, json);

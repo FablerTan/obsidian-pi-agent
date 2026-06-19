@@ -50,8 +50,8 @@ export class PiChatSettingTab extends PluginSettingTab {
 			}
 		}
 
-		// 重新读取压缩阈值（可能换了项目路径）
-		this.compactionThresholds = readCompactionSettings(this.projectPath || undefined);
+		// 重新读取压缩阈值
+		this.compactionThresholds = readCompactionSettings(this.projectPath);
 
 		containerEl.createEl('h2', { text: 'Pi Agent 设置' });
 
@@ -186,7 +186,7 @@ export class PiChatSettingTab extends PluginSettingTab {
 								const num = parseInt(value, 10);
 								if (isNaN(num) || num < 0) return;
 								this.compactionThresholds.reserveTokens = num;
-								writeCompactionSettings(this.compactionThresholds, this.projectPath || undefined);
+								writeCompactionSettings(this.compactionThresholds, this.projectPath);
 							}),
 					);
 			} else {
@@ -219,7 +219,7 @@ export class PiChatSettingTab extends PluginSettingTab {
 							const num = parseInt(value, 10);
 							if (isNaN(num) || num < 0) return;
 							this.compactionThresholds.keepRecentTokens = num;
-							writeCompactionSettings(this.compactionThresholds, this.projectPath || undefined);
+							writeCompactionSettings(this.compactionThresholds, this.projectPath);
 						}),
 					);
 		}
@@ -244,6 +244,6 @@ export class PiChatSettingTab extends PluginSettingTab {
 			const pct = s.compactionPercent / 100;
 			this.compactionThresholds.reserveTokens = Math.round(defaultWindow * (1 - pct));
 		}
-		writeCompactionSettings(this.compactionThresholds, this.projectPath || undefined);
+		writeCompactionSettings(this.compactionThresholds, this.projectPath);
 	}
 }
