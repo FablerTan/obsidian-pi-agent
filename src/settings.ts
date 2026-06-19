@@ -32,13 +32,23 @@ export class PiChatSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-		// 从 pi settings.json 读取的实时值
+	// 从 pi settings.json 读取的实时值
 	private compactionThresholds = readCompactionSettings();
-	private resourcePaths = readResourcePaths();
+
+	// 项目根目录（空表示尚未初始化）
+	private projectPath = '';
 
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
+
+		// 获取项目根目录
+		if (!this.projectPath) {
+			const adapter = this.app.vault.adapter;
+			if ('getBasePath' in adapter) {
+				this.projectPath = (adapter as any).getBasePath();
+			}
+		}
 
 		containerEl.createEl('h2', { text: 'Pi Agent 设置' });
 
@@ -81,44 +91,48 @@ export class PiChatSettingTab extends PluginSettingTab {
 			cls: 'pi-settings-desc',
 		});
 
-		new Setting(containerEl)
-			.setName('技能路径 (skills)')
-			.addText((text) =>
-				text
-					.setPlaceholder('.pi/skills')
-					.setValue(this.plugin.settings.skillPaths)
-					.onChange(async (value) => {
-						this.plugin.settings.skillPaths = value;
-						await this.plugin.saveSettings();
-						this.saveResourcePaths();
-					}),
-			);
+		if (!this.projectPath) {
+			containerEl.createEl('p', { text: '无法获取项目路径，资源路径设置不可用', cls: 'pi-settings-desc' });
+		} else {
+			new Setting(containerEl)
+				.setName('技能路径 (skills)')
+				.addText((text) =>
+					text
+						.setPlaceholder('.pi/skills')
+						.setValue(this.plugin.settings.skillPaths)
+						.onChange(async (value) => {
+							this.plugin.settings.skillPaths = value;
+							await this.plugin.saveSettings();
+							this.saveResourcePaths();
+						}),
+				);
 
-		new Setting(containerEl)
-			.setName('模板路径 (prompts)')
-			.addText((text) =>
-				text
-					.setPlaceholder('.pi/prompts')
-					.setValue(this.plugin.settings.promptPaths)
-					.onChange(async (value) => {
-						this.plugin.settings.promptPaths = value;
-						await this.plugin.saveSettings();
-						this.saveResourcePaths();
-					}),
-			);
+			new Setting(containerEl)
+				.setName('模板路径 (prompts)')
+				.addText((text) =>
+					text
+						.setPlaceholder('.pi/prompts')
+						.setValue(this.plugin.settings.promptPaths)
+						.onChange(async (value) => {
+							this.plugin.settings.promptPaths = value;
+							await this.plugin.saveSettings();
+							this.saveResourcePaths();
+						}),
+				);
 
-		new Setting(containerEl)
-			.setName('扩展路径 (extensions)')
-			.addText((text) =>
-				text
-					.setPlaceholder('.pi/extensions')
-					.setValue(this.plugin.settings.extensionPaths)
-					.onChange(async (value) => {
-						this.plugin.settings.extensionPaths = value;
-						await this.plugin.saveSettings();
-						this.saveResourcePaths();
-					}),
-			);
+			new Setting(containerEl)
+				.setName('扩展路径 (extensions)')
+				.addText((text) =>
+					text
+						.setPlaceholder('.pi/extensions')
+						.setValue(this.plugin.settings.extensionPaths)
+						.onChange(async (value) => {
+							this.plugin.settings.extensionPaths = value;
+							await this.plugin.saveSettings();
+							this.saveResourcePaths();
+						}),
+				);
+		}
 
 		// ── 自动压缩开关 + 阈值 ──
 		new Setting(containerEl)
@@ -208,10 +222,11 @@ export class PiChatSettingTab extends PluginSettingTab {
 		}
 	}
 
-	// ── 写入资源路径到 pi settings.json ──
+	// ── 写入资源路径到项目 .pi/settings.json ──
 	private saveResourcePaths(): void {
+		if (!this.projectPath) return;
 		const toArray = (v: string) => v.split(',').map(s => s.trim()).filter(Boolean);
-		writeResourcePaths({
+		writeResourcePaths(this.projectPath, {
 			skills: toArray(this.plugin.settings.skillPaths),
 			prompts: toArray(this.plugin.settings.promptPaths),
 			extensions: toArray(this.plugin.settings.extensionPaths),
