@@ -33,7 +33,8 @@
 
 ## RPC 缺失
 
-详见 `docs/rpc-gaps.md`，最核心缺失：
-- **Extension UI 协议**（`extension_ui_request`）完全未处理，依赖用户交互的扩展无法工作
-- 多个重要事件（`agent_start`、`queue_update`、`compaction_*` 等）被静默丢弃
-- 多条命令（`steer`/`follow_up`、`compact`、`get_session_stats` 等）从未使用
+详见 `docs/rpc-gaps.md`，按优先级：
+- ~~P0 Extension UI 协议~~ ✅ 已完成（`ExtensionUIHandler.ts`、`test-ext-ui.ts`）
+- P1 多个重要事件（`queue_update`、`compaction_*`、`auto_retry_*`、`message_update` 子事件等）被静默丢弃
+- P2 多条命令（`compact`、`get_session_stats`、`steer`/`follow_up` 等）从未使用
+- P3 锦上添花（`fork`/`clone`、`bash`、`export_html` 等）
