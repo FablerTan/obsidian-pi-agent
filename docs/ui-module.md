@@ -320,14 +320,14 @@
 
 ### 对话型方法（需用户操作后回传 response）
 
-| 方法 | Obsidian UI | 说明 |
-|------|-------------|------|
-| `select` | 自定义 Modal（选项列表） | 用户选择一项后回传 `value` |
-| `confirm` | 自定义 Modal（确认/取消） | 用户确认/取消后回传 `confirmed` |
-| `input` | 自定义 Modal（单行输入） | 用户输入后回传 `value` |
-| `editor` | 自定义 Modal（多行文本区） | 用户编辑后回传 `value` |
+| 方法 | UI 展现 | 说明 |
+|------|---------|------|
+| `select` | 输入框上方内联面板（选项列表按钮） | 用户选择一项后回传 `value` |
+| `confirm` | 输入框上方内联面板（消息 + 确认/取消按钮） | 用户确认/取消后回传 `confirmed` |
+| `input` | 输入框上方内联面板（单行输入框 + 确定/取消） | 用户输入后回传 `value` |
+| `editor` | 输入框上方内联面板（多行文本区 + 确定/取消） | 用户编辑后回传 `value` |
 
-Escape 关闭弹窗时自动发送 `cancelled: true` 响应。
+Escape 关闭面板时自动点击「取消」按钮，发送 `cancelled: true` 响应。
 
 ### 广播型方法（fire-and-forget）
 

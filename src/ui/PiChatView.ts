@@ -113,6 +113,10 @@ export class PiChatView extends ItemView {
         // ── 命令菜单容器 ──
         const menuContainer = inputArea.createDiv({ cls: 'pi-command-menu' });
 
+        // ── Extension UI 内联对话框容器 ──
+        const extUiContainer = inputArea.createDiv({ cls: 'pi-ext-inline-container' });
+        extUiContainer.hidden = true;
+
         // 输入框
         this.textarea = inputArea.createEl('textarea', {
             cls: 'pi-chat-input',
@@ -196,7 +200,7 @@ export class PiChatView extends ItemView {
         });
 
         // ── Extension UI 协议处理器 ──
-        this.extUiHandler = new ExtensionUIHandler(this.app, this.piClient, textarea);
+        this.extUiHandler = new ExtensionUIHandler(this.app, this.piClient, textarea, extUiContainer);
 
         // ── 底部状态栏（模型 + 思考层级） ──
         this.inputStatusBar = new InputStatusBar(inputArea, this.piClient);

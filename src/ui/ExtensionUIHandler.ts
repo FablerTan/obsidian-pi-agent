@@ -1,26 +1,33 @@
 // Extension UI 协议处理器
-// 负责处理 pi 扩展通过 RPC 发来的 UI 交互请求（select/confirm/input/editor 弹窗，
-// 以及 notify/setStatus/setWidget/setTitle/set_editor_text 广播通知）
-import { App, Modal, Notice, setIcon, Setting } from 'obsidian';
+// 负责处理 pi 扩展通过 RPC 发来的 UI 交互请求
+//
+// 对话型方法（select/confirm/input/editor）：
+//   渲染在输入框上方的内联面板中，不弹出独立弹窗
+// 广播型方法（notify/setStatus/setWidget/setTitle/set_editor_text）：
+//   直接执行对应操作
+import { App, Notice } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 
 export class ExtensionUIHandler {
+    // 当前内联对话框的 DOM 元素（不存在时为 null）
+    private dialogEl: HTMLElement | null = null;
+
     constructor(
         private app: App,
         private piClient: PiRpcClient,
         private textarea: HTMLTextAreaElement,
+        // 内联对话框渲染到的容器（位于输入框上方）
+        private containerEl: HTMLElement,
     ) {}
 
     // ── 统一入口：根据 method 分派到具体的处理方法 ──
     handleRequest(event: any): void {
-        const { id, method } = event;
+        const { method } = event;
         switch (method) {
-            // ── 对话型方法 ──
             case 'select':   this.handleSelect(event); break;
             case 'confirm':  this.handleConfirm(event); break;
             case 'input':    this.handleInput(event); break;
             case 'editor':   this.handleEditor(event); break;
-            // ── 广播型方法 ──
             case 'notify':         this.handleNotify(event); break;
             case 'setStatus':      this.handleSetStatus(event); break;
             case 'setWidget':      this.handleSetWidget(event); break;
@@ -32,55 +39,205 @@ export class ExtensionUIHandler {
     }
 
     // ══════════════════════════════════════════════
-    //  对话型方法（需要回传 response）
+    //  对话型方法（内联面板，需要回传 response）
     // ══════════════════════════════════════════════
 
-    // ── select：弹出选项列表 ────────────────────
+    // ── select：选项列表 ────────────────────────
     private handleSelect(request: any): void {
-        const modal = new SelectModal(
-            this.app,
-            request.title || '请选择',
-            request.options || [],
-            (value) => this.respond(request.id, { value }),
-            () => this.respond(request.id, { cancelled: true }),
-        );
-        modal.open();
+        this.showDialog((el) => {
+            // 标题
+            el.createDiv({
+                cls: 'pi-ext-inline-title',
+                text: request.title || '请选择',
+            });
+
+            // 选项列表
+            const list = el.createDiv({ cls: 'pi-ext-inline-options' });
+            for (const opt of (request.options || [])) {
+                const btn = list.createEl('button', {
+                    cls: 'pi-ext-inline-option',
+                    text: opt,
+                });
+                btn.addEventListener('click', () => {
+                    this.closeDialog();
+                    this.respond(request.id, { value: opt });
+                });
+            }
+
+            // 取消按钮
+            this.renderCancelButton(el, request.id);
+        });
     }
 
-    // ── confirm：确认弹窗 ──────────────────────
+    // ── confirm：确认/取消 ──────────────────────
     private handleConfirm(request: any): void {
-        const modal = new ConfirmModal(
-            this.app,
-            request.title || '确认',
-            request.message || '',
-            (confirmed) => this.respond(request.id, { confirmed }),
-            () => this.respond(request.id, { cancelled: true }),
-        );
-        modal.open();
+        this.showDialog((el) => {
+            el.createDiv({
+                cls: 'pi-ext-inline-title',
+                text: request.title || '确认',
+            });
+
+            if (request.message) {
+                el.createDiv({
+                    cls: 'pi-ext-inline-message',
+                    text: request.message,
+                });
+            }
+
+            // 操作栏
+            const footer = el.createDiv({ cls: 'pi-ext-inline-footer' });
+
+            const cancelBtn = footer.createEl('button', {
+                cls: 'pi-ext-inline-btn-cancel',
+                text: '取消',
+            });
+            cancelBtn.addEventListener('click', () => {
+                this.closeDialog();
+                this.respond(request.id, { cancelled: true });
+            });
+
+            const confirmBtn = footer.createEl('button', {
+                cls: 'pi-ext-inline-btn-confirm',
+                text: '确认',
+            });
+            confirmBtn.addEventListener('click', () => {
+                this.closeDialog();
+                this.respond(request.id, { confirmed: true });
+            });
+
+            setTimeout(() => confirmBtn.focus(), 50);
+        });
     }
 
-    // ── input：单行文字输入 ────────────────────
+    // ── input：单行输入 ────────────────────────
     private handleInput(request: any): void {
-        const modal = new InputModal(
-            this.app,
-            request.title || '输入',
-            request.placeholder || '',
-            (value) => this.respond(request.id, { value }),
-            () => this.respond(request.id, { cancelled: true }),
-        );
-        modal.open();
+        this.showDialog((el) => {
+            el.createDiv({
+                cls: 'pi-ext-inline-title',
+                text: request.title || '输入',
+            });
+
+            const input = el.createEl('input', {
+                cls: 'pi-ext-inline-input',
+                type: 'text',
+                placeholder: request.placeholder || '',
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.closeDialog();
+                    this.respond(request.id, { value: input.value });
+                }
+            });
+
+            const footer = el.createDiv({ cls: 'pi-ext-inline-footer' });
+            const cancelBtn = footer.createEl('button', {
+                cls: 'pi-ext-inline-btn-cancel',
+                text: '取消',
+            });
+            cancelBtn.addEventListener('click', () => {
+                this.closeDialog();
+                this.respond(request.id, { cancelled: true });
+            });
+            const okBtn = footer.createEl('button', {
+                cls: 'pi-ext-inline-btn-confirm',
+                text: '确定',
+            });
+            okBtn.addEventListener('click', () => {
+                this.closeDialog();
+                this.respond(request.id, { value: input.value });
+            });
+
+            setTimeout(() => input.focus(), 50);
+        });
     }
 
-    // ── editor：多行文字编辑 ───────────────────
+    // ── editor：多行编辑 ────────────────────────
     private handleEditor(request: any): void {
-        const modal = new EditorModal(
-            this.app,
-            request.title || '编辑',
-            request.prefill || '',
-            (value) => this.respond(request.id, { value }),
-            () => this.respond(request.id, { cancelled: true }),
-        );
-        modal.open();
+        this.showDialog((el) => {
+            el.createDiv({
+                cls: 'pi-ext-inline-title',
+                text: request.title || '编辑',
+            });
+
+            const textarea = el.createEl('textarea', {
+                cls: 'pi-ext-inline-textarea',
+                text: request.prefill || '',
+            });
+
+            const footer = el.createDiv({ cls: 'pi-ext-inline-footer' });
+            const cancelBtn = footer.createEl('button', {
+                cls: 'pi-ext-inline-btn-cancel',
+                text: '取消',
+            });
+            cancelBtn.addEventListener('click', () => {
+                this.closeDialog();
+                this.respond(request.id, { cancelled: true });
+            });
+            const okBtn = footer.createEl('button', {
+                cls: 'pi-ext-inline-btn-confirm',
+                text: '确定',
+            });
+            okBtn.addEventListener('click', () => {
+                this.closeDialog();
+                this.respond(request.id, { value: textarea.value });
+            });
+
+            setTimeout(() => { textarea.focus(); textarea.select(); }, 50);
+        });
+    }
+
+    // ══════════════════════════════════════════════
+    //  内联面板渲染工具
+    // ══════════════════════════════════════════════
+
+    // ── 显示内联对话框 ─────────────────────────
+    private showDialog(buildFn: (el: HTMLElement) => void): void {
+        this.closeDialog();
+
+        this.dialogEl = this.containerEl.createDiv({ cls: 'pi-ext-inline-dialog' });
+
+        // Escape 关闭对话框（触发取消按钮）
+        this.dialogEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                const cancelBtn = this.dialogEl?.querySelector(
+                    '.pi-ext-inline-btn-cancel',
+                ) as HTMLElement | null;
+                cancelBtn?.click();
+            }
+        });
+
+        buildFn(this.dialogEl);
+
+        // 使容器可聚焦，捕获键盘事件
+        this.dialogEl.tabIndex = 0;
+        this.dialogEl.focus();
+        this.containerEl.hidden = false;
+    }
+
+    // ── 关闭内联对话框 ─────────────────────────
+    private closeDialog(): void {
+        if (this.dialogEl) {
+            this.dialogEl.remove();
+            this.dialogEl = null;
+        }
+        this.containerEl.hidden = true;
+        // 焦点回到输入框
+        this.textarea.focus();
+    }
+
+    // ── 通用取消按钮 ───────────────────────────
+    private renderCancelButton(el: HTMLElement, requestId: string): void {
+        const footer = el.createDiv({ cls: 'pi-ext-inline-footer' });
+        const cancelBtn = footer.createEl('button', {
+            cls: 'pi-ext-inline-btn-cancel',
+            text: '取消',
+        });
+        cancelBtn.addEventListener('click', () => {
+            this.closeDialog();
+            this.respond(requestId, { cancelled: true });
+        });
     }
 
     // ══════════════════════════════════════════════
@@ -92,7 +249,6 @@ export class ExtensionUIHandler {
         const { message, notifyType } = request;
         if (!message) return;
         const notice = new Notice(message, 5000);
-        // 根据通知类型调整图标（通过设置 noticeEl 的 CSS class）
         const noticeEl = notice.noticeEl;
         if (notifyType === 'error') {
             noticeEl.addClass('pi-ext-notify-error');
@@ -102,7 +258,6 @@ export class ExtensionUIHandler {
     }
 
     // ── setStatus：设置/清除状态栏文字 ─────────
-    // 使用 Map 存储状态，每次更新后渲染到输入框下方的一个小状态条
     private statusMap = new Map<string, string>();
 
     private handleSetStatus(request: any): void {
@@ -118,7 +273,6 @@ export class ExtensionUIHandler {
     private statusBarEl: HTMLElement | null = null;
 
     private renderStatusBar(): void {
-        // 状态栏插入到 textarea 前面
         if (!this.statusBarEl) {
             this.statusBarEl = this.textarea.parentElement?.createDiv({
                 cls: 'pi-ext-status-bar',
@@ -168,7 +322,6 @@ export class ExtensionUIHandler {
     private widgetsBelowEl: HTMLElement | null = null;
 
     private renderWidgets(): void {
-        // 准备容器
         const above = this.getOrCreateWidgetContainer('aboveEditor');
         const below = this.getOrCreateWidgetContainer('belowEditor');
         above.empty();
@@ -180,10 +333,8 @@ export class ExtensionUIHandler {
         for (const [key, w] of this.widgetMap) {
             const container = w.placement === 'belowEditor' ? below : above;
             const wrapper = container.createDiv({ cls: 'pi-ext-widget' });
-            // 标题行
             const header = wrapper.createDiv({ cls: 'pi-ext-widget-header' });
             header.setText(key);
-            // 内容行
             const body = wrapper.createDiv({ cls: 'pi-ext-widget-body' });
             for (const line of w.lines) {
                 body.createDiv({ cls: 'pi-ext-widget-line', text: line });
@@ -198,19 +349,15 @@ export class ExtensionUIHandler {
 
     private getOrCreateWidgetContainer(placement: string): HTMLElement {
         const isAbove = placement === 'aboveEditor';
-        const key = isAbove ? 'widgetsAboveEl' : 'widgetsBelowEl';
         const cls = isAbove ? 'pi-ext-widgets-above' : 'pi-ext-widgets-below';
 
         let el = isAbove ? this.widgetsAboveEl : this.widgetsBelowEl;
         if (el && el.parentElement) return el;
 
-        // 找到 chat 容器
         const chatContainer = this.textarea.closest('.pi-chat-container');
         if (!chatContainer) {
-            // fallback：插入到 textarea 父元素
             el = this.textarea.parentElement!.createDiv({ cls });
         } else if (isAbove) {
-            // 插入到消息列表和输入区域之间
             const inputArea = chatContainer.querySelector('.pi-chat-input-area');
             if (inputArea) {
                 el = chatContainer.insertBefore(
@@ -221,7 +368,6 @@ export class ExtensionUIHandler {
                 el = chatContainer.createDiv({ cls });
             }
         } else {
-            // 插入到输入区域底部
             el = chatContainer.createDiv({ cls });
         }
 
@@ -230,7 +376,7 @@ export class ExtensionUIHandler {
         return el;
     }
 
-    // ── setTitle：设置窗口标题 ─────────────────
+    // ── setTitle ─────────────────────────────────
     private handleSetTitle(request: any): void {
         const { title } = request;
         if (title) {
@@ -238,7 +384,7 @@ export class ExtensionUIHandler {
         }
     }
 
-    // ── set_editor_text：预设输入框文本 ────────
+    // ── set_editor_text ──────────────────────────
     private handleSetEditorText(request: any): void {
         const { text } = request;
         if (text !== undefined && text !== null) {
@@ -251,13 +397,13 @@ export class ExtensionUIHandler {
     //  工具方法
     // ══════════════════════════════════════════════
 
-    // ── 回传 extension_ui_response ─────────────
     private respond(id: string, data: Record<string, any>): void {
         this.piClient.sendExtensionUIResponse(id, data);
     }
 
     // ── 清理（视图关闭时调用） ─────────────────
     destroy(): void {
+        this.closeDialog();
         this.widgetsAboveEl?.remove();
         this.widgetsBelowEl?.remove();
         this.statusBarEl?.remove();
@@ -266,226 +412,5 @@ export class ExtensionUIHandler {
         this.statusBarEl = null;
         this.statusMap.clear();
         this.widgetMap.clear();
-    }
-}
-
-// ══════════════════════════════════════════════════
-//  模态弹窗组件
-// ══════════════════════════════════════════════════
-
-// ── Select 弹窗 ────────────────────────────────
-class SelectModal extends Modal {
-    constructor(
-        app: App,
-        private titleText: string,
-        private options: string[],
-        private onSelect: (value: string) => void,
-        private onCancel: () => void,
-    ) {
-        super(app);
-    }
-
-    onOpen(): void {
-        this.titleEl.setText(this.titleText);
-        this.modalEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                this.onCancel();
-                this.close();
-            }
-        });
-        const list = this.contentEl.createDiv({ cls: 'pi-ext-select-list' });
-        for (const opt of this.options) {
-            const btn = list.createEl('button', {
-                cls: 'pi-ext-select-option',
-                text: opt,
-            });
-            btn.addEventListener('click', () => {
-                this.onSelect(opt);
-                this.close();
-            });
-        }
-    }
-
-    onClose(): void {
-        this.contentEl.empty();
-    }
-}
-
-// ── Confirm 弹窗 ──────────────────────────────
-class ConfirmModal extends Modal {
-    constructor(
-        app: App,
-        private titleText: string,
-        private message: string,
-        private onConfirm: (confirmed: boolean) => void,
-        private onCancel: () => void,
-    ) {
-        super(app);
-    }
-
-    onOpen(): void {
-        this.titleEl.setText(this.titleText);
-        this.modalEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                this.onCancel();
-                this.close();
-            }
-        });
-        this.contentEl.createDiv({
-            cls: 'pi-ext-confirm-message',
-            text: this.message,
-        });
-        const btnGroup = this.contentEl.createDiv({
-            cls: 'pi-ext-confirm-buttons',
-        });
-        const cancelBtn = btnGroup.createEl('button', {
-            cls: 'pi-ext-btn-cancel',
-            text: '取消',
-        });
-        cancelBtn.addEventListener('click', () => {
-            this.onCancel();
-            this.close();
-        });
-        const confirmBtn = btnGroup.createEl('button', {
-            cls: 'pi-ext-btn-confirm',
-            text: '确认',
-        });
-        confirmBtn.addEventListener('click', () => {
-            this.onConfirm(true);
-            this.close();
-        });
-        // 焦点给确认按钮
-        setTimeout(() => confirmBtn.focus(), 50);
-    }
-
-    onClose(): void {
-        this.contentEl.empty();
-    }
-}
-
-// ── Input 弹窗 ────────────────────────────────
-class InputModal extends Modal {
-    private inputEl!: HTMLInputElement;
-
-    constructor(
-        app: App,
-        private titleText: string,
-        private placeholder: string,
-        private onSubmit: (value: string) => void,
-        private onCancel: () => void,
-    ) {
-        super(app);
-    }
-
-    onOpen(): void {
-        this.titleEl.setText(this.titleText);
-        this.modalEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                this.onCancel();
-                this.close();
-            }
-        });
-        this.inputEl = this.contentEl.createEl('input', {
-            cls: 'pi-ext-input-field',
-            type: 'text',
-            placeholder: this.placeholder,
-        });
-        this.inputEl.style.width = '100%';
-        this.inputEl.style.marginBottom = '12px';
-        this.inputEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                this.onSubmit(this.inputEl.value);
-                this.close();
-            }
-        });
-        const btnGroup = this.contentEl.createDiv({
-            cls: 'pi-ext-confirm-buttons',
-        });
-        const cancelBtn = btnGroup.createEl('button', {
-            cls: 'pi-ext-btn-cancel',
-            text: '取消',
-        });
-        cancelBtn.addEventListener('click', () => {
-            this.onCancel();
-            this.close();
-        });
-        const okBtn = btnGroup.createEl('button', {
-            cls: 'pi-ext-btn-confirm',
-            text: '确定',
-        });
-        okBtn.addEventListener('click', () => {
-            this.onSubmit(this.inputEl.value);
-            this.close();
-        });
-        setTimeout(() => this.inputEl.focus(), 50);
-    }
-
-    onClose(): void {
-        this.contentEl.empty();
-    }
-}
-
-// ── Editor 弹窗（多行文本编辑） ──────────────
-class EditorModal extends Modal {
-    private textareaEl!: HTMLTextAreaElement;
-
-    constructor(
-        app: App,
-        private titleText: string,
-        private prefill: string,
-        private onSubmit: (value: string) => void,
-        private onCancel: () => void,
-    ) {
-        super(app);
-    }
-
-    onOpen(): void {
-        this.titleEl.setText(this.titleText);
-        this.modalEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                this.onCancel();
-                this.close();
-            }
-        });
-        this.textareaEl = this.contentEl.createEl('textarea', {
-            cls: 'pi-ext-editor-field',
-            text: this.prefill,
-        });
-        this.textareaEl.style.width = '100%';
-        this.textareaEl.style.height = '200px';
-        this.textareaEl.style.marginBottom = '12px';
-        this.textareaEl.style.resize = 'vertical';
-        const btnGroup = this.contentEl.createDiv({
-            cls: 'pi-ext-confirm-buttons',
-        });
-        const cancelBtn = btnGroup.createEl('button', {
-            cls: 'pi-ext-btn-cancel',
-            text: '取消',
-        });
-        cancelBtn.addEventListener('click', () => {
-            this.onCancel();
-            this.close();
-        });
-        const okBtn = btnGroup.createEl('button', {
-            cls: 'pi-ext-btn-confirm',
-            text: '确定',
-        });
-        okBtn.addEventListener('click', () => {
-            this.onSubmit(this.textareaEl.value);
-            this.close();
-        });
-        setTimeout(() => {
-            this.textareaEl.focus();
-            this.textareaEl.select();
-        }, 50);
-    }
-
-    onClose(): void {
-        this.contentEl.empty();
     }
 }

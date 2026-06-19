@@ -1054,67 +1054,123 @@ If your plugin does not need CSS, delete this file.
    Extension UI 协议
    ═══════════════════════════════════════════════ */
 
-/* Select 弹窗选项列表 */
-.pi-ext-select-list {
+/* ── 内联对话框容器 ──────────────────────────
+   位于输入框上方，不使用时隐藏 */
+.pi-ext-inline-container {
+    position: relative;
+}
+
+/* ── 内联对话框面板 ──────────────────────────
+   显示在输入框上方的卡片式面板 */
+.pi-ext-inline-dialog {
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    outline: none;
+}
+
+/* 标题 */
+.pi-ext-inline-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-normal);
+    margin-bottom: 10px;
+    white-space: pre-wrap;
+}
+
+/* 消息正文（confirm） */
+.pi-ext-inline-message {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+/* 选项列表（select） */
+.pi-ext-inline-options {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    margin-bottom: 8px;
 }
-.pi-ext-select-option {
+.pi-ext-inline-option {
     text-align: left;
     padding: 8px 12px;
     border: 1px solid var(--background-modifier-border);
     border-radius: 6px;
     background: var(--background-primary);
     cursor: pointer;
+    font-size: 13px;
+    color: var(--text-normal);
     transition: background 0.15s;
 }
-.pi-ext-select-option:hover {
+.pi-ext-inline-option:hover {
     background: var(--background-modifier-hover);
 }
 
-/* Confirm 弹窗 */
-.pi-ext-confirm-message {
-    margin-bottom: 16px;
-    color: var(--text-muted);
-    line-height: 1.5;
+/* 输入框（input） */
+.pi-ext-inline-input {
+    width: 100%;
+    font-family: var(--font-monospace);
+    font-size: 13px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text-normal);
+    margin-bottom: 8px;
+    box-sizing: border-box;
 }
-.pi-ext-confirm-buttons {
+.pi-ext-inline-input:focus {
+    border-color: var(--interactive-accent);
+    outline: none;
+}
+
+/* 文本区（editor） */
+.pi-ext-inline-textarea {
+    width: 100%;
+    min-height: 120px;
+    font-family: var(--font-monospace);
+    font-size: 13px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text-normal);
+    resize: vertical;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+}
+.pi-ext-inline-textarea:focus {
+    border-color: var(--interactive-accent);
+    outline: none;
+}
+
+/* 底部操作栏 */
+.pi-ext-inline-footer {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
 }
-.pi-ext-btn-cancel,
-.pi-ext-btn-confirm {
+.pi-ext-inline-btn-cancel,
+.pi-ext-inline-btn-confirm {
     padding: 6px 16px;
     border-radius: 6px;
     cursor: pointer;
     border: 1px solid var(--background-modifier-border);
-    font-size: 14px;
+    font-size: 13px;
 }
-.pi-ext-btn-cancel {
+.pi-ext-inline-btn-cancel {
     background: var(--background-secondary);
     color: var(--text-normal);
 }
-.pi-ext-btn-confirm {
+.pi-ext-inline-btn-confirm {
     background: var(--interactive-accent);
     color: var(--text-on-accent);
-}
-
-/* Input / Editor 输入字段 */
-.pi-ext-input-field,
-.pi-ext-editor-field {
-    font-family: var(--font-monospace);
-    background: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 6px;
-    padding: 8px;
-    color: var(--text-normal);
-}
-.pi-ext-input-field:focus,
-.pi-ext-editor-field:focus {
     border-color: var(--interactive-accent);
-    outline: none;
 }
 
 /* 状态栏 */
