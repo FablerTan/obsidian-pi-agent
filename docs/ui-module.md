@@ -82,6 +82,8 @@
 | `tool_execution_end` | 标记完成/失败 |
 | `agent_start` | 设置 `isAgentActive` + 确保加载动画 |
 | `agent_end` | 清理状态 + 清除 `isAgentActive` |
+| `compaction_start` | 显示「正在压缩…」系统消息 |
+| `compaction_end` | 更新消息为完成/取消/失败（含释放 token 数） |
 | `error` / `extension_error` | 显示 Notice |
 
 **未处理的事件**（被静默丢弃）：详见 `docs/rpc-gaps.md`

@@ -67,6 +67,12 @@ export class PiChatView extends ItemView {
     // 当前 AI 是否正在处理请求
     private isAgentActive = false;
 
+    // 是否正在压缩会话上下文
+    private isCompacting = false;
+
+    // 压缩状态的系统消息元素（用于更新而不是重复添加）
+    private compactionMsgEl: HTMLElement | null = null;
+
     // Extension UI 协议处理器
     private extUiHandler!: ExtensionUIHandler;
 
@@ -358,6 +364,69 @@ export class PiChatView extends ItemView {
                 this.thinkingBlock = null;
                 this.toolCalls.clear();
                 new Notice('Pi 返回了错误');
+                break;
+            }
+            case 'compaction_start': {
+                this.isCompacting = true;
+                const reasonMap: Record<string, string> = {
+                    manual: '手动', threshold: '阈值', overflow: '溢出',
+                };
+                const reasonText = reasonMap[event.reason] || event.reason || '';
+                this.addSystemMessage('compress', '正在压缩会话…', (el) => {
+                    this.compactionMsgEl = el;
+                    el.createDiv({ text: '正在压缩上下文，请稍候…' });
+                    if (reasonText) {
+                        el.createDiv({ text: `原因: ${reasonText}` });
+                    }
+                });
+                break;
+            }
+            case 'compaction_end': {
+                this.isCompacting = false;
+                // 尝试更新之前添加的 compaction 消息
+                const el = this.compactionMsgEl;
+                this.compactionMsgEl = null;
+                if (el && this.messagesEl.contains(el)) {
+                    // 直接更新已有消息的图标和标题
+                    const header = el.querySelector('.pi-msg-system-header');
+                    if (header) {
+                        const iconEl = header.querySelector('.pi-msg-system-icon');
+                        if (iconEl) setIcon(iconEl as HTMLElement, event.aborted ? 'x-circle' : 'check-circle');
+                        const titleEl = header.querySelector('.pi-msg-system-title');
+                        if (titleEl) {
+                            if (event.aborted) titleEl.setText('压缩已取消');
+                            else if (event.errorMessage) titleEl.setText('压缩失败');
+                            else titleEl.setText('压缩完成');
+                        }
+                    }
+                    const body = el.querySelector('.pi-msg-system-body');
+                    if (body) {
+                        if (event.aborted) {
+                            body.setText('会话压缩被中止');
+                        } else if (event.errorMessage) {
+                            body.setText(`压缩失败: ${event.errorMessage}`);
+                        } else if (event.result) {
+                            const saved = event.result.tokensBefore ?? 0;
+                            body.setText(`已释放 ${saved.toLocaleString()} token 空间`);
+                        }
+                    }
+                } else {
+                    // 消息不在 DOM 中了，重新添加一条
+                    if (event.aborted) {
+                        this.addSystemMessage('x-circle', '压缩已取消', (el) => {
+                            el.setText('会话压缩被中止');
+                        });
+                    } else if (event.errorMessage) {
+                        this.addSystemMessage('alert-circle', '压缩失败', (el) => {
+                            el.setText(`压缩失败: ${event.errorMessage}`);
+                        });
+                    } else if (event.result) {
+                        const saved = event.result.tokensBefore ?? 0;
+                        this.addSystemMessage('check-circle', '压缩完成', (el) => {
+                            el.setText(`已释放 ${saved.toLocaleString()} token 空间`);
+                        });
+                    }
+                }
                 break;
             }
             case 'extension_ui_request': {

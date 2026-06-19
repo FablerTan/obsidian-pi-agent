@@ -53,10 +53,11 @@
 | 事件 | 用途 | 影响 |
 |------|------|------|
 | ~~`agent_start`~~ | ~~AI 开始处理请求~~ | ✅ 已处理 |
+| ~~`compaction_start` / `compaction_end`~~ | ~~压缩开始/完成~~ | ✅ 已处理 |
 | `turn_start` / `turn_end` | 一个回合开始/完成（含助手回复 + 工具结果） | 无法精确追踪回合边界 |
 | `message_start` / `message_end` | 一条消息开始/完成 | 无法获取完整消息对象 |
 | `queue_update` | 待处理队列变化（steering/followUp 数组） | 无法知道排了多少消息等待处理 |
-| `compaction_start` / `compaction_end` | 压缩开始/完成 | 无法展示压缩状态 |
+| ~~`compaction_start` / `compaction_end`~~ | ~~压缩开始/完成~~ | ✅ 已处理 |
 | `auto_retry_start` / `auto_retry_end` | 自动重试开始/完成 | 用户不知道在重试 |
 
 ### `message_update` 子事件中漏掉的
@@ -77,6 +78,8 @@
 |------|------|
 | `agent_start` | `PiChatView.handlePiEvent()` — 设置 `isAgentActive` + 确保加载动画 |
 | `agent_end` | `PiChatView.handlePiEvent()` — 清理状态 + 清除 `isAgentActive` |
+| `compaction_start` | `PiChatView.handlePiEvent()` — 显示「正在压缩…」系统消息 |
+| `compaction_end` | `PiChatView.handlePiEvent()` — 更新消息为完成/取消/失败 |
 | `message_update.text_delta` | `PiChatView.handlePiEvent()` — 追加助手文字 |
 | `message_update.toolcall_start` | `PiChatView.handlePiEvent()` — 隐藏加载动画 |
 | `message_update.thinking_start` | `PiChatView.handlePiEvent()` — 创建 ThinkingBlock |
@@ -139,6 +142,6 @@ Pi 扩展可以通过 `ctx.ui.select()`、`ctx.ui.confirm()`、`ctx.ui.input()` 
 | 层级 | 内容 | 状态 |
 |------|------|------|
 | 🚨 ~~P0~~ | ~~Extension UI 协议（9 个子方法全部缺失）~~ | ✅ 已完成（`ExtensionUIHandler.ts`） |
-| 🔴 P1 | 漏掉的关键事件（`queue_update`、`compaction_*`、`auto_retry_*`、`message_update` 子事件） | 待做 |
+| 🔴 P1 | 漏掉的关键事件（`queue_update`、`auto_retry_*`、`message_update` 子事件） | 待做 |
 | 🟡 P2 | 有用的命令（`compact`、`get_session_stats`、`steer`/`follow_up`） | 待做 |
 | 🟢 P3 | 锦上添花（`fork`/`clone`、`bash`、`export_html` 等） | 待做 |
