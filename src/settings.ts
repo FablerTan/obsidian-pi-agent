@@ -228,11 +228,13 @@ export class PiChatSettingTab extends PluginSettingTab {
 	// ── 写入资源路径到项目 .pi/settings.json ──
 	private saveResourcePaths(): void {
 		if (!this.projectPath) return;
-		const toArray = (v: string) => v.split(',').map(s => s.trim()).filter(Boolean);
+		// 用户填的是项目根目录相对路径，但 .pi/settings.json 中的路径
+		// 相对于 .pi/ 目录解析，所以前面加 ../ 修正
+		const toPiRelative = (v: string) => v.split(',').map(s => s.trim()).filter(Boolean).map(p => `../${p}`);
 		writeResourcePaths(this.projectPath, {
-			skills: toArray(this.plugin.settings.skillPaths),
-			prompts: toArray(this.plugin.settings.promptPaths),
-			extensions: toArray(this.plugin.settings.extensionPaths),
+			skills: toPiRelative(this.plugin.settings.skillPaths),
+			prompts: toPiRelative(this.plugin.settings.promptPaths),
+			extensions: toPiRelative(this.plugin.settings.extensionPaths),
 		});
 	}
 
