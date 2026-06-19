@@ -387,13 +387,6 @@ If your plugin does not need CSS, delete this file.
     flex-shrink: 0;            /* 不被 flex 压缩，按实际内容高度显示 */
 }
 
-/* ── 排队中的用户消息（AI 输出时发送的 followUp） ── */
-.pi-chat-msg-queued {
-    opacity: 0.5;
-    border: 1px dashed var(--interactive-accent);
-    background: transparent;
-    color: var(--text-muted);
-}
 
 .pi-chat-msg-assistant {
     background: var(--background-secondary);

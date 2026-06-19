@@ -76,8 +76,11 @@ export class PiChatView extends ItemView {
     // 排队队列指示器（在 header 中显示）
     private queueBadgeEl: HTMLElement | null = null;
 
-    // 排队中的用户消息 DOM 元素（按先进先出顺序）
-    private queuedMsgEls: HTMLElement[] = [];
+    // 排队中的用户消息文本（按先进先出顺序，不在 UI 中显示）
+    private queuedTexts: string[] = [];
+
+    // 上一次 queue_update 的总数，用于检测出队
+    private prevQueueTotal = 0;
 
 
 
@@ -209,13 +212,8 @@ export class PiChatView extends ItemView {
                 textarea.value = '';
 
                 if (this.isAgentActive) {
-                    // AI 正在输出，排队等待（followUp）
-                    // 标记消息为排队状态
-                    const lastMsg = this.messagesEl.querySelector('.pi-chat-msg-user:last-child') as HTMLElement | null;
-                    if (lastMsg) {
-                        lastMsg.addClass('pi-chat-msg-queued');
-                        this.queuedMsgEls.push(lastMsg);
-                    }
+                    // AI 正在输出，不加入 UI，先放入排队队列
+                    this.queuedTexts.push(msg);
                     this.piClient.send({ type: 'prompt', message: finalMsg, streamingBehavior: 'followUp' });
                 } else {
                     this.showLoading();
@@ -367,10 +365,10 @@ export class PiChatView extends ItemView {
             }
             case 'agent_start': {
                 this.isAgentActive = true;
-                // 备用：新 agent 开始时也尝试还原第一条排队消息
-                const nextMsg = this.queuedMsgEls.shift();
-                if (nextMsg && this.messagesEl.contains(nextMsg)) {
-                    nextMsg.removeClass('pi-chat-msg-queued');
+                // 有排队消息出队，加入 UI 作为正常用户消息
+                const nextText = this.queuedTexts.shift();
+                if (nextText) {
+                    this.addUserMessage(nextText);
                 }
                 if (!this.loadingEl) {
                     this.showLoading();
@@ -379,13 +377,7 @@ export class PiChatView extends ItemView {
             }
             case 'agent_end': {
                 this.isAgentActive = false;
-                // 上一轮对话结束，还原所有排队消息为正常样式
-                for (const el of this.queuedMsgEls) {
-                    if (el && this.messagesEl.contains(el)) {
-                        el.removeClass('pi-chat-msg-queued');
-                    }
-                }
-                this.queuedMsgEls = [];
+                // agent_end 不清空排队文本——它们会在后续 agent_start 中逐条出队
                 this.currentMarkdown = null;
                 this.currentAssistantEl = null;
                 this.thinkingBlock = null;
@@ -405,14 +397,14 @@ export class PiChatView extends ItemView {
             case 'queue_update': {
                 const total = (event.steering?.length ?? 0) + (event.followUp?.length ?? 0);
                 if (this.queueBadgeEl) {
+                    this.queueBadgeEl.hidden = total <= 0;
                     if (total > 0) {
                         this.queueBadgeEl.setText(`${total} 条等待`);
-                        this.queueBadgeEl.hidden = false;
-                    } else {
-                        this.queueBadgeEl.hidden = true;
-                        this.queuedMsgEls = [];
                     }
                 }
+                // 出队检测：总数减少，说明有消息开始被处理了
+                // 对应的文本会在 agent_start 中用 shift 取出
+                this.prevQueueTotal = total;
                 break;
             }
             case 'compaction_start': {
@@ -560,8 +552,8 @@ export class PiChatView extends ItemView {
         this.thinkingBlock = null;
         this.toolCalls.clear();
         // 打断后如果有排队的消息，保持其排队样式，等待后续处理
-        if (this.queuedMsgEls.length > 0) {
-            new Notice(`已打断，还有 ${this.queuedMsgEls.length} 条排队消息待处理`);
+        if (this.queuedTexts.length > 0) {
+            new Notice(`已打断，还有 ${this.queuedTexts.length} 条排队消息待处理`);
         } else {
             new Notice('已打断');
         }
