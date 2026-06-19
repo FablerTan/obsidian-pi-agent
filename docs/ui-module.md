@@ -258,12 +258,21 @@
 | 方法 | 说明 |
 |------|------|
 | `setCommands(items)` | 设置可用命令列表 |
-| `show(query)` | 按前缀筛选并渲染 |
+| `show(query)` | 按任意连续子串筛选并渲染 |
 | `hide()` | 移除菜单 |
 | `isVisible()` | 菜单是否可见 |
 | `handleKeydown(e)` | 键盘导航 |
 
 **数据来源**：`get_commands` RPC
+
+**图标映射**：
+
+| source 类型 | 图标 |
+|-------------|------|
+| `extension` | puzzle |
+| `skill`     | sparkles |
+| `prompt`    | file-plus |
+| 其他        | file-text |
 
 **UI 结构**：
 ```

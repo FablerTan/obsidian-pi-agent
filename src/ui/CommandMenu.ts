@@ -35,7 +35,7 @@ export class CommandMenu {
     show(query: string): void {
         const q = query.toLowerCase();
         this.filtered = this.items.filter(cmd =>
-            cmd.name.toLowerCase().startsWith(q),
+            cmd.name.toLowerCase().includes(q),
         );
         this.selectedIndex = 0;
         this._visible = true;
@@ -100,6 +100,7 @@ export class CommandMenu {
             const iconSpan = li.createSpan({ cls: 'pi-command-icon' });
             const iconName = cmd.source === 'skill' ? 'sparkles'
                 : cmd.source === 'extension' ? 'puzzle'
+                : cmd.source === 'prompt' ? 'file-plus'
                 : 'file-text';
             setIcon(iconSpan, iconName);
 
