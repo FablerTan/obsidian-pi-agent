@@ -7,11 +7,15 @@ import { readCompactionSettings, writeCompactionSettings } from './utils/pi-sett
 export interface PiChatSettings {
 	piPath: string;
 	autoCompaction: boolean;
+	compactionMode: 'token' | 'percent';
+	compactionPercent: number;
 }
 
 export const DEFAULT_SETTINGS: PiChatSettings = {
 	piPath: '/opt/homebrew/bin/pi',
 	autoCompaction: true,
+	compactionMode: 'token',
+	compactionPercent: 80,
 };
 
 export class PiChatSettingTab extends PluginSettingTab {
@@ -63,8 +67,8 @@ export class PiChatSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		// ── 自动压缩开关 ──
-		new Setting(containerEl)
+		// ── 自动压缩开关 + 阈值 ──
+		const compactionSetting = new Setting(containerEl)
 			.setName('自动压缩')
 			.setDesc('上下文接近上限时自动压缩，释放 token 空间。')
 			.addToggle((toggle) =>
@@ -74,40 +78,96 @@ export class PiChatSettingTab extends PluginSettingTab {
 						this.plugin.settings.autoCompaction = value;
 						await this.plugin.saveSettings();
 						this.plugin.applyAutoCompaction();
+						this.display(); // 刷新显示/隐藏阈值区域
 					}),
 			);
 
-		// ── 压缩阈值（直接写入 pi 的 settings.json） ──
-		containerEl.createEl('h3', { text: '压缩阈值' });
+		// 只有开启自动压缩时才显示阈值设置
+		if (this.plugin.settings.autoCompaction) {
+			containerEl.createEl('h3', { text: '压缩阈值' });
 
-		new Setting(containerEl)
-			.setName('预留 Token (reserveTokens)')
-			.setDesc('为 LLM 回复预留的 token 数。上下文窗口 - 预留值 = 触发压缩的阈值。默认 16384。')
-			.addText((text) =>
-				text
-					.setPlaceholder('16384')
-					.setValue(String(this.compactionThresholds.reserveTokens))
-					.onChange((value) => {
-						const num = parseInt(value, 10);
-						if (isNaN(num) || num < 0) return;
-						this.compactionThresholds.reserveTokens = num;
-						writeCompactionSettings(this.compactionThresholds);
-					}),
-			);
+			// ── 触发方式切换 ──
+			new Setting(containerEl)
+				.setName('触发方式')
+				.setDesc('选择使用固定 Token 数还是上下文百分比触发压缩。')
+				.addDropdown((dropdown) =>
+					dropdown
+						.addOption('token', 'Token 数')
+						.addOption('percent', '百分比')
+						.setValue(this.plugin.settings.compactionMode)
+						.onChange(async (value) => {
+							this.plugin.settings.compactionMode = value as 'token' | 'percent';
+							await this.plugin.saveSettings();
+							this.saveCompactionThresholds();
+							this.display();
+						}),
+				);
 
-		new Setting(containerEl)
-			.setName('保留 Token (keepRecentTokens)')
-			.setDesc('压缩时保留的最近 token 数，不参与摘要。默认 20000。')
-			.addText((text) =>
-				text
-					.setPlaceholder('20000')
-					.setValue(String(this.compactionThresholds.keepRecentTokens))
-					.onChange((value) => {
-						const num = parseInt(value, 10);
-						if (isNaN(num) || num < 0) return;
-						this.compactionThresholds.keepRecentTokens = num;
-						writeCompactionSettings(this.compactionThresholds);
-					}),
-			);
+			if (this.plugin.settings.compactionMode === 'token') {
+				// Token 模式
+				new Setting(containerEl)
+					.setName('预留 Token (reserveTokens)')
+					.setDesc('为 LLM 回复预留的 token 数。上下文窗口 − 预留值 = 触发压缩的阈值。默认 16384。')
+					.addText((text) =>
+						text
+							.setPlaceholder('16384')
+							.setValue(String(this.compactionThresholds.reserveTokens))
+							.onChange((value) => {
+								const num = parseInt(value, 10);
+								if (isNaN(num) || num < 0) return;
+								this.compactionThresholds.reserveTokens = num;
+								writeCompactionSettings(this.compactionThresholds);
+							}),
+					);
+			} else {
+				// 百分比模式
+				new Setting(containerEl)
+					.setName('触发百分比')
+					.setDesc('上下文用到百分之多少时触发压缩。例如 80% = 上下文用到 80% 时开始压缩。')
+					.addSlider((slider) =>
+						slider
+							.setLimits(10, 95, 5)
+							.setValue(this.plugin.settings.compactionPercent)
+							.setDynamicTooltip()
+							.onChange(async (value) => {
+								this.plugin.settings.compactionPercent = value;
+								await this.plugin.saveSettings();
+								this.saveCompactionThresholds();
+							}),
+					);
+			}
+
+			// 两种模式都显示保留 Token
+			new Setting(containerEl)
+				.setName('保留 Token (keepRecentTokens)')
+				.setDesc('压缩时保留的最近 token 数，不参与摘要。默认 20000。')
+				.addText((text) =>
+					text
+						.setPlaceholder('20000')
+						.setValue(String(this.compactionThresholds.keepRecentTokens))
+						.onChange((value) => {
+							const num = parseInt(value, 10);
+							if (isNaN(num) || num < 0) return;
+							this.compactionThresholds.keepRecentTokens = num;
+							writeCompactionSettings(this.compactionThresholds);
+						}),
+					);
+		}
+	}
+
+	// ── 按当前模式计算并写入 pi 的 settings.json ──
+	private saveCompactionThresholds(): void {
+		const s = this.plugin.settings;
+		if (s.compactionMode === 'percent') {
+			// 百分比 → 推算 reserveTokens（按默认 200K 上下文窗口估算）
+			const defaultWindow = 200000;
+			const pct = s.compactionPercent / 100;
+			// trigger: contextTokens > contextWindow - reserveTokens
+			// want: contextTokens = contextWindow * pct
+			// => contextWindow * pct > contextWindow - reserveTokens
+			// => reserveTokens > contextWindow * (1 - pct)
+			this.compactionThresholds.reserveTokens = Math.round(defaultWindow * (1 - pct));
+		}
+		writeCompactionSettings(this.compactionThresholds);
 	}
 }
