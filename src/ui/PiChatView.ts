@@ -375,7 +375,8 @@ export class PiChatView extends ItemView {
                 };
                 const reasonText = reasonMap[event.reason] || event.reason || '';
                 this.addSystemMessage('compress', '正在压缩会话…', (el) => {
-                    this.compactionMsgEl = el;
+                    // el 是 body 子元素，存父元素以便后续更新 header
+                    this.compactionMsgEl = el.parentElement ?? el;
                     el.createDiv({ text: '正在压缩上下文，请稍候…' });
                     if (reasonText) {
                         el.createDiv({ text: `原因: ${reasonText}` });
@@ -391,6 +392,7 @@ export class PiChatView extends ItemView {
                 if (el && this.messagesEl.contains(el)) {
                     // 直接更新已有消息的图标和标题
                     const header = el.querySelector('.pi-msg-system-header');
+                    this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
                     if (header) {
                         const iconEl = header.querySelector('.pi-msg-system-icon');
                         if (iconEl) setIcon(iconEl as HTMLElement, event.aborted ? 'x-circle' : 'check-circle');
