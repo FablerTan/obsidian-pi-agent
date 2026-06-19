@@ -311,3 +311,45 @@
         ├── .pi-status-icon (brain)
         └── .pi-status-label (off/min/med/high)
 ```
+
+---
+
+## 10. `ExtensionUIHandler.ts` — Extension UI 协议处理
+
+处理 pi 扩展发起的用户交互请求。所有方法通过 `handleRequest(event)` 统一入口分派。
+
+### 对话型方法（需用户操作后回传 response）
+
+| 方法 | Obsidian UI | 说明 |
+|------|-------------|------|
+| `select` | 自定义 Modal（选项列表） | 用户选择一项后回传 `value` |
+| `confirm` | 自定义 Modal（确认/取消） | 用户确认/取消后回传 `confirmed` |
+| `input` | 自定义 Modal（单行输入） | 用户输入后回传 `value` |
+| `editor` | 自定义 Modal（多行文本区） | 用户编辑后回传 `value` |
+
+Escape 关闭弹窗时自动发送 `cancelled: true` 响应。
+
+### 广播型方法（fire-and-forget）
+
+| 方法 | 实现 |
+|------|------|
+| `notify` | `new Notice()` + 根据 warn/error 添加边框颜色 |
+| `setStatus` | 输入框上方小状态条，Map 管理多 key |
+| `setWidget` | 消息列表与输入区之间的浮动部件（aboveEditor/belowEditor） |
+| `setTitle` | `document.title = title` |
+| `set_editor_text` | 设置 textarea.value |
+
+### 数据流向
+
+```
+pi 进程 → stdout (extension_ui_request) → rpc-client.handleEvent()
+  → onEvent → PiChatView.handlePiEvent('extension_ui_request')
+  → ExtensionUIHandler.handleRequest(event)
+    → 对话型：弹出 Modal → 用户操作 → sendExtensionUIResponse(id, data) → stdin
+    → 广播型：直接执行（Notice / 状态栏 / 部件等）
+```
+
+### 生命周期
+
+- 构造：`onOpen()` 中实例化，传入 `app`、`piClient`、`textarea`
+- 销毁：`onClose()` 中调用 `destroy()` 移除 DOM 元素

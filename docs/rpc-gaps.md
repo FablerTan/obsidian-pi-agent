@@ -135,9 +135,9 @@ Pi 扩展可以通过 `ctx.ui.select()`、`ctx.ui.confirm()`、`ctx.ui.input()` 
 
 ## 优先级总结
 
-| 层级 | 内容 | 建议顺序 |
-|------|------|----------|
-| 🚨 P0 | Extension UI 协议（9 个子方法全部缺失） | 优先做 |
-| 🔴 P1 | 漏掉的关键事件（`queue_update`、`compaction_*`、`auto_retry_*`、`message_update` 子事件） | 其次做 |
-| 🟡 P2 | 有用的命令（`compact`、`get_session_stats`、`steer`/`follow_up`） | 后续添加 |
-| 🟢 P3 | 锦上添花（`fork`/`clone`、`bash`、`export_html` 等） | 有需求时再加 |
+| 层级 | 内容 | 状态 |
+|------|------|------|
+| 🚨 ~~P0~~ | ~~Extension UI 协议（9 个子方法全部缺失）~~ | ✅ 已完成（`ExtensionUIHandler.ts`） |
+| 🔴 P1 | 漏掉的关键事件（`queue_update`、`compaction_*`、`auto_retry_*`、`message_update` 子事件） | 待做 |
+| 🟡 P2 | 有用的命令（`compact`、`get_session_stats`、`steer`/`follow_up`） | 待做 |
+| 🟢 P3 | 锦上添花（`fork`/`clone`、`bash`、`export_html` 等） | 待做 |

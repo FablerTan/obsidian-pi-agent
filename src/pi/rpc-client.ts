@@ -123,6 +123,11 @@ export class PiRpcClient {
         });
     }
 
+    // ── 发送 Extension UI 响应（回应用户在弹窗中的选择） ──
+    sendExtensionUIResponse(id: string, data: Record<string, any>): boolean {
+        return this.send({ type: 'extension_ui_response', id, ...data }) !== null;
+    }
+
     // ── 快捷发送 prompt ─────────────────────────
     prompt(message: string): void {
         this.send({ type: 'prompt', message });

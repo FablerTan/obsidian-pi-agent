@@ -10,6 +10,7 @@ import { InputStatusBar } from './InputStatusBar';
 import { NoteBar } from './NoteBar';
 import { WelcomePage } from './WelcomePage';
 import { ThinkingBlock } from './ThinkingBlock';
+import { ExtensionUIHandler } from './ExtensionUIHandler';
 
 // 视图的唯一标识符，用来注册和查找这个视图
 export const PI_CHAT_VIEW_TYPE = 'pi-chat-view';
@@ -62,6 +63,9 @@ export class PiChatView extends ItemView {
 
     // reload 进行中标志，防止重复触发
     private isReloading = false;
+
+    // Extension UI 协议处理器
+    private extUiHandler!: ExtensionUIHandler;
 
     // RPC 客户端
     private piClient: PiRpcClient;
@@ -191,6 +195,9 @@ export class PiChatView extends ItemView {
             }
         });
 
+        // ── Extension UI 协议处理器 ──
+        this.extUiHandler = new ExtensionUIHandler(this.app, this.piClient, textarea);
+
         // ── 底部状态栏（模型 + 思考层级） ──
         this.inputStatusBar = new InputStatusBar(inputArea, this.piClient);
 
@@ -203,6 +210,7 @@ export class PiChatView extends ItemView {
     async onClose(): Promise<void> {
         this.piClient.onEvent = null;
         this.noteBar?.destroy();
+        this.extUiHandler?.destroy();
     }
 
     // ── 添加用户消息 ──────────────────────────
@@ -334,6 +342,10 @@ export class PiChatView extends ItemView {
                 this.thinkingBlock = null;
                 this.toolCalls.clear();
                 new Notice('Pi 返回了错误');
+                break;
+            }
+            case 'extension_ui_request': {
+                this.extUiHandler?.handleRequest(event);
                 break;
             }
         }

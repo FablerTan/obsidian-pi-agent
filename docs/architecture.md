@@ -18,6 +18,7 @@ src/
     NoteBar.ts          笔记栏（笔记名 + 选中文本追踪，位于输入框上方）
     InputStatusBar.ts   底部状态栏（模型选择 + 思考层级切换）
     WelcomePage.ts      欢迎页（首次对话前显示上下文和命令列表）
+    ExtensionUIHandler.ts Extension UI 协议处理器（select/confirm/input/editor 弹窗等）
   utils/
     helpers.ts          工具函数（文本提取等）
 
@@ -38,7 +39,7 @@ docs/
 |------|------|
 | [`docs/overview.md`](overview.md) | 外部依赖、数据流全景、会话存储 |
 | [`docs/pi-module.md`](pi-module.md) | RPC 通信层 `rpc-client.ts` |
-| [`docs/ui-module.md`](ui-module.md) | 全部 UI 组件（PiChatView、NoteBar、ThinkingBlock、WelcomePage、HistoryPanel、MarkdownMsg、ToolCallMsg、CommandMenu、InputStatusBar） |
+| [`docs/ui-module.md`](ui-module.md) | 全部 UI 组件（PiChatView、NoteBar、ThinkingBlock、WelcomePage、HistoryPanel、MarkdownMsg、ToolCallMsg、CommandMenu、InputStatusBar、ExtensionUIHandler） |
 | [`docs/utils-and-settings.md`](utils-and-settings.md) | 工具函数 `helpers.ts` + 配置管理 `settings.ts` |
 | [`docs/known-issues.md`](known-issues.md) | 已知 Bug、安全性问题、功能缺陷 |
 | [`docs/rpc-gaps.md`](rpc-gaps.md) | Pi RPC 协议未处理清单 |

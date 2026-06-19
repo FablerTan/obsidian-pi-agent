@@ -274,7 +274,6 @@ If your plugin does not need CSS, delete this file.
 .pi-welcome-section-label {}
 
 .pi-welcome-section-count {
-    margin-left: auto;
     font-size: 11px;
     color: var(--text-faint);
     font-weight: normal;
@@ -1049,4 +1048,119 @@ If your plugin does not need CSS, delete this file.
     font-size: 11px;
     color: var(--text-normal);
     background: var(--background-primary);
+}
+
+/* ═══════════════════════════════════════════════
+   Extension UI 协议
+   ═══════════════════════════════════════════════ */
+
+/* Select 弹窗选项列表 */
+.pi-ext-select-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.pi-ext-select-option {
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-primary);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.pi-ext-select-option:hover {
+    background: var(--background-modifier-hover);
+}
+
+/* Confirm 弹窗 */
+.pi-ext-confirm-message {
+    margin-bottom: 16px;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+.pi-ext-confirm-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+.pi-ext-btn-cancel,
+.pi-ext-btn-confirm {
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid var(--background-modifier-border);
+    font-size: 14px;
+}
+.pi-ext-btn-cancel {
+    background: var(--background-secondary);
+    color: var(--text-normal);
+}
+.pi-ext-btn-confirm {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+/* Input / Editor 输入字段 */
+.pi-ext-input-field,
+.pi-ext-editor-field {
+    font-family: var(--font-monospace);
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    padding: 8px;
+    color: var(--text-normal);
+}
+.pi-ext-input-field:focus,
+.pi-ext-editor-field:focus {
+    border-color: var(--interactive-accent);
+    outline: none;
+}
+
+/* 状态栏 */
+.pi-ext-status-bar {
+    display: flex;
+    gap: 12px;
+    padding: 2px 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--background-secondary);
+    border-top: 1px solid var(--background-modifier-border);
+    flex-wrap: wrap;
+}
+
+/* Widget 容器 */
+.pi-ext-widgets-above {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+.pi-ext-widgets-below {
+    padding: 4px 8px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+.pi-ext-widget {
+    margin-bottom: 4px;
+}
+.pi-ext-widget-header {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.pi-ext-widget-body {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+}
+.pi-ext-widget-line {
+    line-height: 1.4;
+}
+
+/* Notify 类型 */
+.pi-ext-notify-error {
+    border-left: 4px solid var(--color-red);
+}
+.pi-ext-notify-warning {
+    border-left: 4px solid var(--color-orange);
 }
