@@ -29,9 +29,10 @@ function writeFullSettings(settingsPath: string, json: Record<string, any>): voi
 	fs.writeFileSync(settingsPath, JSON.stringify(json, null, 2) + '\n', 'utf-8');
 }
 
-/** 读取 pi 的压缩阈值设置（全局 ~/.pi/agent/settings.json） */
-export function readCompactionSettings(): PiCompactionSettings {
-	const json = readFullSettings(GLOBAL_SETTINGS_PATH);
+/** 读取压缩阈值设置。优先读项目 .pi/settings.json，没有则读全局 */
+export function readCompactionSettings(projectPath?: string): PiCompactionSettings {
+	const path_ = projectPath ? path.join(projectPath, '.pi', 'settings.json') : GLOBAL_SETTINGS_PATH;
+	const json = readFullSettings(path_);
 	const c = json.compaction || {};
 	return {
 		reserveTokens: c.reserveTokens ?? 16384,
@@ -39,11 +40,12 @@ export function readCompactionSettings(): PiCompactionSettings {
 	};
 }
 
-/** 写入压缩阈值到全局设置 */
-export function writeCompactionSettings(settings: PiCompactionSettings): void {
-	const json = readFullSettings(GLOBAL_SETTINGS_PATH);
+/** 写入压缩阈值到项目 .pi/settings.json（如果没传 projectPath 则写入全局） */
+export function writeCompactionSettings(settings: PiCompactionSettings, projectPath?: string): void {
+	const path_ = projectPath ? path.join(projectPath, '.pi', 'settings.json') : GLOBAL_SETTINGS_PATH;
+	const json = readFullSettings(path_);
 	json.compaction = { ...json.compaction, ...settings };
-	writeFullSettings(GLOBAL_SETTINGS_PATH, json);
+	writeFullSettings(path_, json);
 }
 
 /** 读取项目级资源路径配置（.pi/settings.json） */

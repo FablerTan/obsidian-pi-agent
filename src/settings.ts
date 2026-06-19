@@ -2,7 +2,7 @@
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import PiChatPlugin from './main';
 import { detectPiPath } from './utils/detect-pi';
-import { readCompactionSettings, writeCompactionSettings, readResourcePaths, writeResourcePaths } from './utils/pi-settings';
+import { readCompactionSettings, writeCompactionSettings, readResourcePaths, writeResourcePaths, PiCompactionSettings } from './utils/pi-settings';
 
 export interface PiChatSettings {
 	piPath: string;
@@ -32,11 +32,11 @@ export class PiChatSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	// 从 pi settings.json 读取的实时值
-	private compactionThresholds = readCompactionSettings();
-
 	// 项目根目录（空表示尚未初始化）
 	private projectPath = '';
+
+	// 压缩阈值（每次 display 时重新读取）
+	private compactionThresholds: PiCompactionSettings = { reserveTokens: 16384, keepRecentTokens: 20000 };
 
 	display(): void {
 		const { containerEl } = this;
@@ -49,6 +49,9 @@ export class PiChatSettingTab extends PluginSettingTab {
 				this.projectPath = (adapter as any).getBasePath();
 			}
 		}
+
+		// 重新读取压缩阈值（可能换了项目路径）
+		this.compactionThresholds = readCompactionSettings(this.projectPath || undefined);
 
 		containerEl.createEl('h2', { text: 'Pi Agent 设置' });
 
@@ -183,7 +186,7 @@ export class PiChatSettingTab extends PluginSettingTab {
 								const num = parseInt(value, 10);
 								if (isNaN(num) || num < 0) return;
 								this.compactionThresholds.reserveTokens = num;
-								writeCompactionSettings(this.compactionThresholds);
+								writeCompactionSettings(this.compactionThresholds, this.projectPath || undefined);
 							}),
 					);
 			} else {
@@ -216,7 +219,7 @@ export class PiChatSettingTab extends PluginSettingTab {
 							const num = parseInt(value, 10);
 							if (isNaN(num) || num < 0) return;
 							this.compactionThresholds.keepRecentTokens = num;
-							writeCompactionSettings(this.compactionThresholds);
+							writeCompactionSettings(this.compactionThresholds, this.projectPath || undefined);
 						}),
 					);
 		}
@@ -233,19 +236,14 @@ export class PiChatSettingTab extends PluginSettingTab {
 		});
 	}
 
-	// ── 按当前模式计算并写入 pi 的 settings.json ──
+	// ── 按当前模式计算并写入项目 .pi/settings.json ──
 	private saveCompactionThresholds(): void {
 		const s = this.plugin.settings;
 		if (s.compactionMode === 'percent') {
-			// 百分比 → 推算 reserveTokens（按默认 200K 上下文窗口估算）
 			const defaultWindow = 200000;
 			const pct = s.compactionPercent / 100;
-			// trigger: contextTokens > contextWindow - reserveTokens
-			// want: contextTokens = contextWindow * pct
-			// => contextWindow * pct > contextWindow - reserveTokens
-			// => reserveTokens > contextWindow * (1 - pct)
 			this.compactionThresholds.reserveTokens = Math.round(defaultWindow * (1 - pct));
 		}
-		writeCompactionSettings(this.compactionThresholds);
+		writeCompactionSettings(this.compactionThresholds, this.projectPath || undefined);
 	}
 }
