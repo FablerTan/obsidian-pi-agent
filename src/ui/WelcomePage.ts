@@ -96,8 +96,8 @@ export class WelcomePage {
         const titleRow = section.createDiv({ cls: 'pi-welcome-section-title' });
         const iconEl = titleRow.createSpan({ cls: 'pi-welcome-section-icon' });
         setIcon(iconEl, icon);
-        const count = titleRow.createSpan({ cls: 'pi-welcome-section-count', text: String(items.length) });
         titleRow.createSpan({ cls: 'pi-welcome-section-label', text: title });
+        const count = titleRow.createSpan({ cls: 'pi-welcome-section-count', text: String(items.length) });
 
         const list = section.createEl('ul', { cls: 'pi-welcome-list' });
         const shown = items.slice(0, 3);

@@ -274,13 +274,24 @@ export class ExtensionUIHandler {
 
     private renderStatusBar(): void {
         if (!this.statusBarEl) {
-            this.statusBarEl = this.textarea.parentElement?.createDiv({
-                cls: 'pi-ext-status-bar',
-            }) ?? null;
-            if (this.statusBarEl) {
-                this.textarea.parentElement?.insertBefore(
-                    this.statusBarEl, this.textarea,
+            // 状态栏插入到 pi-chat-header 和 pi-chat-container 之间
+            const wrapper = this.textarea.closest('.pi-chat-wrapper');
+            const container = wrapper?.querySelector('.pi-chat-container');
+            if (wrapper && container) {
+                this.statusBarEl = wrapper.insertBefore(
+                    wrapper.createDiv({ cls: 'pi-ext-status-bar' }),
+                    container,
                 );
+            } else {
+                // fallback：插入到 textarea 前面
+                this.statusBarEl = this.textarea.parentElement?.createDiv({
+                    cls: 'pi-ext-status-bar',
+                }) ?? null;
+                if (this.statusBarEl) {
+                    this.textarea.parentElement?.insertBefore(
+                        this.statusBarEl, this.textarea,
+                    );
+                }
             }
         }
         if (!this.statusBarEl) return;
