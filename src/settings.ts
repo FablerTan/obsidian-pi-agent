@@ -5,10 +5,12 @@ import { detectPiPath } from './utils/detect-pi';
 
 export interface PiChatSettings {
 	piPath: string;
+	autoCompaction: boolean;
 }
 
 export const DEFAULT_SETTINGS: PiChatSettings = {
 	piPath: '/opt/homebrew/bin/pi',
+	autoCompaction: true,
 };
 
 export class PiChatSettingTab extends PluginSettingTab {
@@ -53,6 +55,19 @@ export class PiChatSettingTab extends PluginSettingTab {
 						} else {
 							new Notice('未找到 pi，请手动输入路径');
 						}
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('自动压缩')
+			.setDesc('上下文接近上限时自动压缩，释放 token 空间。')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoCompaction)
+					.onChange(async (value) => {
+						this.plugin.settings.autoCompaction = value;
+						await this.plugin.saveSettings();
+						this.plugin.applyAutoCompaction();
 					}),
 			);
 	}

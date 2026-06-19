@@ -26,6 +26,8 @@ export default class PiChatPlugin extends Plugin {
 		// 启动 pi RPC 客户端（后台连接 pi 进程）
 		this.piClient = new PiRpcClient();
 		this.piClient.setPiPath(this.settings.piPath);
+		// 传入自动压缩设置，rpc-client 启动后自动应用
+		this.piClient.setAutoCompactionSilent(this.settings.autoCompaction);
 		const vaultPath = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
 		this.piClient.start(vaultPath).catch((err) => {
 			new Notice('Pi 启动失败: ' + err.message);
@@ -98,5 +100,11 @@ export default class PiChatPlugin extends Plugin {
 		this.piClient?.restart().catch((err) => {
 			new Notice('Pi 重启失败: ' + err.message);
 		});
+	}
+
+	// 用户切换自动压缩开关时调用
+	applyAutoCompaction(): void {
+		this.piClient?.setAutoCompactionSilent(this.settings.autoCompaction);
+		this.piClient?.setAutoCompaction(this.settings.autoCompaction).catch(() => {});
 	}
 }

@@ -8,6 +8,9 @@ export class PiRpcClient {
     // pi 可执行文件路径
     private piPath = '/opt/homebrew/bin/pi';
 
+    // 自动压缩设置（启动后/重启后应用）
+    private _autoCompaction = true;
+
     // 接收 stdout 数据的缓冲区（数据是一块块到的，要拼成完整行再解析）
     private buffer = '';
 
@@ -81,6 +84,8 @@ export class PiRpcClient {
 
             this.sendAndWait({ type: 'get_state' }).then(() => {
                 clearTimeout(timeout);
+                // pi 就绪后应用自动压缩设置
+                this.setAutoCompaction(this._autoCompaction).catch(() => {});
                 resolve();
             }).catch(reject);
         });
@@ -145,6 +150,17 @@ export class PiRpcClient {
     // ── 获取会话统计（token 用量、费用等） ─────
     getSessionStats(): Promise<any> {
         return this.sendAndWait({ type: 'get_session_stats' });
+    }
+
+    // ── 设置自动压缩 ───────────────────────────
+    setAutoCompaction(enabled: boolean): Promise<any> {
+        this._autoCompaction = enabled;
+        return this.sendAndWait({ type: 'set_auto_compaction', enabled });
+    }
+
+    // ── 预设自动压缩（不发送 RPC，启动后自动应用） ──
+    setAutoCompactionSilent(enabled: boolean): void {
+        this._autoCompaction = enabled;
     }
 
     // ── 快捷发送 prompt ─────────────────────────
