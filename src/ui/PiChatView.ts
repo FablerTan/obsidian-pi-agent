@@ -79,8 +79,7 @@ export class PiChatView extends ItemView {
     // 排队中的用户消息 DOM 元素（按先进先出顺序）
     private queuedMsgEls: HTMLElement[] = [];
 
-    // 上一次 queue_update 的排队总数，用于计算新出队的消息
-    private prevQueueTotal = 0;
+
 
     // Extension UI 协议处理器
     private extUiHandler!: ExtensionUIHandler;
@@ -368,6 +367,11 @@ export class PiChatView extends ItemView {
             }
             case 'agent_start': {
                 this.isAgentActive = true;
+                // 出队第一条排队消息，还原正常样式
+                const nextMsg = this.queuedMsgEls.shift();
+                if (nextMsg && this.messagesEl.contains(nextMsg)) {
+                    nextMsg.removeClass('pi-chat-msg-queued');
+                }
                 // 确保加载动画显示（如果还未显示）
                 if (!this.loadingEl) {
                     this.showLoading();
@@ -394,7 +398,6 @@ export class PiChatView extends ItemView {
             }
             case 'queue_update': {
                 const total = (event.steering?.length ?? 0) + (event.followUp?.length ?? 0);
-                // 更新徽章
                 if (this.queueBadgeEl) {
                     if (total > 0) {
                         this.queueBadgeEl.setText(`${total} 条等待`);
@@ -404,17 +407,6 @@ export class PiChatView extends ItemView {
                         this.queuedMsgEls = [];
                     }
                 }
-                // 有消息出队 → 取消其排队样式
-                const dequeued = this.prevQueueTotal - total;
-                if (dequeued > 0) {
-                    for (let i = 0; i < dequeued && this.queuedMsgEls.length > 0; i++) {
-                        const el = this.queuedMsgEls.shift();
-                        if (el && this.messagesEl.contains(el)) {
-                            el.removeClass('pi-chat-msg-queued');
-                        }
-                    }
-                }
-                this.prevQueueTotal = total;
                 break;
             }
             case 'compaction_start': {
