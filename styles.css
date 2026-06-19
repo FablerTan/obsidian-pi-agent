@@ -325,15 +325,7 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* ── 排队队列指示器 ────────────────── */
-.pi-chat-queue-badge {
-    margin-left: auto;
-    font-size: 11px;
-    color: var(--text-on-accent);
-    background: var(--interactive-accent);
-    padding: 1px 8px;
-    border-radius: 10px;
-    white-space: nowrap;
-}
+
 
 /* ── 加载动画 ──────────────────────── */
 .pi-chat-loading {
