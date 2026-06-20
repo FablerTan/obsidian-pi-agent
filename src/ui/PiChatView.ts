@@ -1,5 +1,6 @@
 // 聊天面板核心视图
 // 负责：面板生命周期、消息流（用户输入 + AI 回复）、加载动画、命令菜单、历史面板
+import * as os from 'os';
 import * as path from 'path';
 import { ItemView, WorkspaceLeaf, Notice, setIcon, FileSystemAdapter } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
@@ -858,18 +859,23 @@ export class PiChatView extends ItemView {
     }
 
     // ── 构建扩展发现扫描目录列表 ──────────────
+    // 三个来源：
+    //   1. 全局目录 ~/.pi/agent/extensions
+    //   2. 项目默认 .pi/extensions（相对 vault 根）
+    //   3. 项目配置路径（相对 .pi/ 文件夹）
     private buildScanDirs(): string[] {
         const dirs: string[] = [
+            path.join(os.homedir(), '.pi', 'agent', 'extensions'),
             path.join(this.vaultPath, '.pi', 'extensions'),
-            path.join(this.vaultPath, '.pi', 'agent', 'extensions'),
         ];
-        // 用户配置的额外扩展路径（逗号分隔，相对 vault 根）
+        // 用户配置的扩展路径（逗号分隔，以 .pi/ 为基点）
         const extra = this.settings.extensionPaths;
         if (extra) {
+            const piBase = path.join(this.vaultPath, '.pi');
             for (const p of extra.split(',')) {
                 const trimmed = p.trim();
                 if (trimmed) {
-                    dirs.push(path.resolve(this.vaultPath, trimmed));
+                    dirs.push(path.resolve(piBase, trimmed));
                 }
             }
         }
