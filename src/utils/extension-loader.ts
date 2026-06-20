@@ -37,12 +37,22 @@ export function discoverExtensions(
     }
 
     // ── 2. 扫描磁盘目录，找出所有 .ts 文件 ──
+    // 支持两种扩展布局：
+    //   *.ts           （直接文件名，如 test-ext-ui.ts）
+    //   */index.ts     （子目录，如 auto-commit/index.ts）
     const diskFiles = new Set<string>();
     for (const dir of scanDirs) {
         try {
-            for (const f of fs.readdirSync(dir)) {
-                if (f.endsWith('.ts')) {
-                    diskFiles.add(path.resolve(dir, f));
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const fullPath = path.resolve(dir, entry.name);
+                if (entry.isFile() && entry.name.endsWith('.ts')) {
+                    diskFiles.add(fullPath);
+                } else if (entry.isDirectory()) {
+                    // 子目录，检查 index.ts
+                    const indexPath = path.join(fullPath, 'index.ts');
+                    if (fs.existsSync(indexPath)) {
+                        diskFiles.add(indexPath);
+                    }
                 }
             }
         } catch {
