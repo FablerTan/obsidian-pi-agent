@@ -498,8 +498,8 @@ If your plugin does not need CSS, delete this file.
     vertical-align: super;
 }
 
-/* 无命令的扩展（仅事件钩子，不注册 / 命令） */
-.pi-reload-item-no-cmd {
+/* 未确认的扩展（磁盘发现但未在 get_commands 中出现） */
+.pi-reload-item-unconfirmed {
     opacity: 0.6;
     font-style: italic;
 }
