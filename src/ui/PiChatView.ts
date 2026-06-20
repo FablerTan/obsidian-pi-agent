@@ -859,38 +859,20 @@ export class PiChatView extends ItemView {
     }
 
     // ── 构建扩展发现扫描目录列表 ──────────────
-    // 始终扫描全局目录。项目目录来源：
-    //   有 setting 配置 → 用配置路径（替换项目默认）
-    //   无 setting 配置 → 用项目默认 .pi/extensions
-    //
-    // 配置路径解析规则：
-    //   ../xxx  → 去掉 ../，拼接 {vault}/xxx
-    //   xxx     → 拼接 {vault}/.pi/xxx
     private buildScanDirs(): string[] {
-        // 1. 全局目录（始终扫描）
         const dirs: string[] = [
             path.join(os.homedir(), '.pi', 'agent', 'extensions'),
+            path.join(this.vaultPath, '.pi', 'extensions'),
         ];
-
         const extra = this.settings.extensionPaths;
         if (extra) {
-            // 有配置：用配置路径替换项目默认
             for (const p of extra.split(',')) {
                 const trimmed = p.trim();
-                if (!trimmed) continue;
-                if (trimmed.startsWith('..')) {
-                    // ../xxx → 去掉 ../，拼接 vault 根
-                    dirs.push(path.join(this.vaultPath, trimmed.replace(/^\.\.\/?/, '')));
-                } else {
-                    // xxx → 拼接 .pi/
-                    dirs.push(path.join(this.vaultPath, '.pi', trimmed.replace(/^\.\/?/, '')));
+                if (trimmed) {
+                    dirs.push(path.resolve(this.vaultPath, trimmed));
                 }
             }
-        } else {
-            // 无配置：用项目默认
-            dirs.push(path.join(this.vaultPath, '.pi', 'extensions'));
         }
-
         return dirs;
     }
 
