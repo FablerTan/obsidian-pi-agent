@@ -1,1 +1,0 @@
-测试 auto-commit：这个文件的变更应该触发 git diff --stat，用来验证 commit.sh 纯基于 diff 生成摘要。
