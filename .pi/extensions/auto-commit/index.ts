@@ -7,8 +7,8 @@ const FILE_TOOLS = ["write", "edit"];
 const MUTATING_CMDS = ["rm ", "mv ", "cp ", "mkdir ", "touch "];
 
 // 脚本路径 = 当前扩展所在目录 + commit.sh
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const script = join(__dirname, "commit.sh");
+const extDir = dirname(fileURLToPath(import.meta.url));
+const script = join(extDir, "commit.sh");
 
 export default function (pi: ExtensionAPI) {
   let modified = false;
