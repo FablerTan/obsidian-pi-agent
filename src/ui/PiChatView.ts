@@ -869,17 +869,16 @@ export class PiChatView extends ItemView {
             path.join(this.vaultPath, '.pi', 'extensions'),
         ];
         // 用户配置的扩展路径（逗号分隔，以 .pi/ 为基点）
+        //   extensions        → {vault}/.pi/extensions/
+        //   ../extensions     → {vault}/extensions/  （../ 往上到 vault 根）
         const extra = this.settings.extensionPaths;
         if (extra) {
             const piBase = path.join(this.vaultPath, '.pi');
             for (const p of extra.split(',')) {
-                let trimmed = p.trim();
-                if (!trimmed) continue;
-                // 相对路径：剪掉前导 ../ 和 .pi/（旧基点残留，当前基点已是 .pi/）
-                if (!path.isAbsolute(trimmed) && !trimmed.startsWith('~')) {
-                    trimmed = trimmed.replace(/^(\.\.\/)+/, '').replace(/^\.pi\//, '').replace(/^\.\//, '');
+                const trimmed = p.trim();
+                if (trimmed) {
+                    dirs.push(path.resolve(piBase, trimmed));
                 }
-                dirs.push(path.resolve(piBase, trimmed));
             }
         }
         return dirs;
