@@ -1,8 +1,6 @@
 // 聊天面板核心视图
 // 负责：面板生命周期、消息流（用户输入 + AI 回复）、加载动画、命令菜单、历史面板
-import * as os from 'os';
-import * as path from 'path';
-import { ItemView, WorkspaceLeaf, Notice, setIcon, FileSystemAdapter } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, setIcon } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 import { HistoryPanel } from './HistoryPanel';
 import { MarkdownMsg } from './MarkdownMsg';
@@ -14,7 +12,7 @@ import { WelcomePage } from './WelcomePage';
 import { ThinkingBlock } from './ThinkingBlock';
 import { ExtensionUIHandler } from './ExtensionUIHandler';
 import { PiChatSettings } from '../settings';
-import { discoverExtensions, ExtensionInfo } from '../utils/extension-loader';
+import { extractExtensions, ExtensionInfo } from '../utils/extension-loader';
 
 // 视图的唯一标识符，用来注册和查找这个视图
 export const PI_CHAT_VIEW_TYPE = 'pi-chat-view';
@@ -68,10 +66,7 @@ export class PiChatView extends ItemView {
     // 上一次 get_commands 返回的原始命令数组（含 path 字段），用于扩展发现
     private lastRawCommands: any[] = [];
 
-    // vault 根目录（绝对路径）
-    private vaultPath: string;
-
-    // 插件设置引用
+    // 插件设置引用（用于扩展发现）
     private settings: PiChatSettings;
 
     // reload 进行中标志，防止重复触发
@@ -98,7 +93,6 @@ export class PiChatView extends ItemView {
         super(leaf);
         this.piClient = piClient;
         this.settings = settings;
-        this.vaultPath = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
 
         // 注册事件回调：pi 返回的事件都到这里
         this.piClient.onEvent = (event) => {
@@ -858,29 +852,8 @@ export class PiChatView extends ItemView {
             .join('\n');
     }
 
-    // ── 构建扩展发现扫描目录列表 ──────────────
-    private buildScanDirs(): string[] {
-        const dirs: string[] = [
-            path.join(os.homedir(), '.pi', 'agent', 'extensions'),
-            path.join(this.vaultPath, '.pi', 'extensions'),
-        ];
-        const extra = this.settings.extensionPaths;
-        if (extra) {
-            for (const p of extra.split(',')) {
-                const trimmed = p.trim();
-                if (trimmed) {
-                    dirs.push(path.resolve(this.vaultPath, trimmed));
-                }
-            }
-        }
-        return dirs;
-    }
-
-    // ── 发现扩展信息（磁盘扫描 + commands 交叉引用） ──
+    // ── 从 get_commands 提取扩展信息 ──
     private buildExtensionInfo(): ExtensionInfo[] {
-        return discoverExtensions(
-            this.lastRawCommands,
-            this.buildScanDirs(),
-        );
+        return extractExtensions(this.lastRawCommands);
     }
 }
