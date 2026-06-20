@@ -859,28 +859,38 @@ export class PiChatView extends ItemView {
     }
 
     // ── 构建扩展发现扫描目录列表 ──────────────
-    // 三个来源：
-    //   1. 全局目录 ~/.pi/agent/extensions
-    //   2. 项目默认 .pi/extensions（相对 vault 根）
-    //   3. 项目配置路径（相对 .pi/ 文件夹）
+    // 始终扫描全局目录。项目目录来源：
+    //   有 setting 配置 → 用配置路径（替换项目默认）
+    //   无 setting 配置 → 用项目默认 .pi/extensions
+    //
+    // 配置路径解析规则：
+    //   ../xxx  → 去掉 ../，拼接 {vault}/xxx
+    //   xxx     → 拼接 {vault}/.pi/xxx
     private buildScanDirs(): string[] {
+        // 1. 全局目录（始终扫描）
         const dirs: string[] = [
             path.join(os.homedir(), '.pi', 'agent', 'extensions'),
-            path.join(this.vaultPath, '.pi', 'extensions'),
         ];
-        // 用户配置的扩展路径（逗号分隔，以 .pi/ 为基点）
-        //   extensions        → {vault}/.pi/extensions/
-        //   ../extensions     → {vault}/extensions/  （../ 往上到 vault 根）
+
         const extra = this.settings.extensionPaths;
         if (extra) {
-            const piBase = path.join(this.vaultPath, '.pi');
+            // 有配置：用配置路径替换项目默认
             for (const p of extra.split(',')) {
                 const trimmed = p.trim();
-                if (trimmed) {
-                    dirs.push(path.resolve(piBase, trimmed));
+                if (!trimmed) continue;
+                if (trimmed.startsWith('..')) {
+                    // ../xxx → 去掉 ../，拼接 vault 根
+                    dirs.push(path.join(this.vaultPath, trimmed.replace(/^\.\.\/?/, '')));
+                } else {
+                    // xxx → 拼接 .pi/
+                    dirs.push(path.join(this.vaultPath, '.pi', trimmed.replace(/^\.\/?/, '')));
                 }
             }
+        } else {
+            // 无配置：用项目默认
+            dirs.push(path.join(this.vaultPath, '.pi', 'extensions'));
         }
+
         return dirs;
     }
 
