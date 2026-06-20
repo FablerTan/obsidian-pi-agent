@@ -36,7 +36,7 @@ export default class PiChatPlugin extends Plugin {
 		// 注册聊天面板视图
 		this.registerView(
 			PI_CHAT_VIEW_TYPE,
-			(leaf) => new PiChatView(leaf, this.piClient),
+			(leaf) => new PiChatView(leaf, this.piClient, this.settings),
 		);
 
 		// 左侧栏图标，点击打开聊天面板

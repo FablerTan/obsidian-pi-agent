@@ -1,6 +1,7 @@
 // 聊天面板核心视图
 // 负责：面板生命周期、消息流（用户输入 + AI 回复）、加载动画、命令菜单、历史面板
-import { ItemView, WorkspaceLeaf, Notice, setIcon } from 'obsidian';
+import * as path from 'path';
+import { ItemView, WorkspaceLeaf, Notice, setIcon, FileSystemAdapter } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 import { HistoryPanel } from './HistoryPanel';
 import { MarkdownMsg } from './MarkdownMsg';
@@ -11,6 +12,8 @@ import { NoteBar } from './NoteBar';
 import { WelcomePage } from './WelcomePage';
 import { ThinkingBlock } from './ThinkingBlock';
 import { ExtensionUIHandler } from './ExtensionUIHandler';
+import { PiChatSettings } from '../settings';
+import { discoverExtensions, ExtensionInfo } from '../utils/extension-loader';
 
 // 视图的唯一标识符，用来注册和查找这个视图
 export const PI_CHAT_VIEW_TYPE = 'pi-chat-view';
@@ -61,6 +64,15 @@ export class PiChatView extends ItemView {
     // 上一次加载的完整命令数据（含 source），用于 /reload 失败时回退显示
     private previousCmdList: { name: string; source: string }[] = [];
 
+    // 上一次 get_commands 返回的原始命令数组（含 path 字段），用于扩展发现
+    private lastRawCommands: any[] = [];
+
+    // vault 根目录（绝对路径）
+    private vaultPath: string;
+
+    // 插件设置引用
+    private settings: PiChatSettings;
+
     // reload 进行中标志，防止重复触发
     private isReloading = false;
 
@@ -81,9 +93,11 @@ export class PiChatView extends ItemView {
     // RPC 客户端
     private piClient: PiRpcClient;
 
-    constructor(leaf: WorkspaceLeaf, piClient: PiRpcClient) {
+    constructor(leaf: WorkspaceLeaf, piClient: PiRpcClient, settings: PiChatSettings) {
         super(leaf);
         this.piClient = piClient;
+        this.settings = settings;
+        this.vaultPath = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
 
         // 注册事件回调：pi 返回的事件都到这里
         this.piClient.onEvent = (event) => {
@@ -113,7 +127,6 @@ export class PiChatView extends ItemView {
         // 消息列表
         const messagesEl = container.createDiv({ cls: 'pi-chat-messages' });
         this.welcomePage = new WelcomePage(messagesEl, this.app, this.piClient);
-        this.welcomePage.loadData();
 
         // 历史会话管理器（通过 /history 命令触发）
         this.historyPanel = new HistoryPanel(this.piClient, messagesEl, contentEl, this.app);
@@ -235,6 +248,10 @@ export class PiChatView extends ItemView {
 
         // 预加载命令列表（作为 reload 对比基准）
         await this.loadCommands();
+
+        // pi 就绪后再加载欢迎页数据（含扩展发现）
+        const extInfo = this.buildExtensionInfo();
+        this.welcomePage.loadData(extInfo);
     }
 
     async onClose(): Promise<void> {
@@ -493,6 +510,7 @@ export class PiChatView extends ItemView {
                 // 保存命令名（不含 builtins）用于 reload 对比
                 this.previousCmdNames = new Set(cmds.map((c: any) => c.name));
                 this.previousCmdList = cmds.map((c: any) => ({ name: c.name, source: c.source || 'other' }));
+                this.lastRawCommands = cmds;
             }
         } catch { /* pi 还未就绪，忽略 */ }
     }
@@ -512,7 +530,7 @@ export class PiChatView extends ItemView {
                 this.thinkingBlock = null;
                 this.toolCalls.clear();
                 this.welcomePage = new WelcomePage(this.messagesEl, this.app, this.piClient);
-                this.welcomePage.loadData();
+                this.welcomePage.loadData(this.buildExtensionInfo());
                 new Notice('已创建新会话');
             } else {
                 new Notice('新建会话失败');
@@ -670,15 +688,19 @@ export class PiChatView extends ItemView {
             { name: 'stats', description: '查看 Token 用量统计', source: 'extension' as const },
             ...cmds,
         ]);
-        // 按 source 分组
+
+        // 扩展发现（磁盘扫描 + commands 交叉引用）
+        const extInfo = this.buildExtensionInfo();
+
+        // 按 source 分组（排除 extension，扩展用磁盘扫描结果展示）
         const groups = new Map<string, { name: string; source: string }[]>();
         for (const c of cmds) {
             const src = c.source || 'other';
+            if (src === 'extension') continue;
             if (!groups.has(src)) groups.set(src, []);
             groups.get(src)!.push({ name: c.name, source: src });
         }
         const newNames = new Set(cmds.map((c: any) => c.name));
-        // 对比 oldNames vs newNames
         const removedNames = new Set<string>();
         for (const old of oldNames) {
             if (!newNames.has(old)) {
@@ -691,7 +713,24 @@ export class PiChatView extends ItemView {
         };
         const order = ['extension', 'skill', 'prompt', 'tool', 'model'];
         this.addSystemMessage('refresh-cw', 'Pi 已重载', (el) => {
+            // ── 扩展：用磁盘扫描结果展示（含无命令的扩展） ──
+            if (extInfo.length > 0) {
+                const extSection = el.createDiv({ cls: 'pi-reload-section' });
+                extSection.createSpan({ cls: 'pi-reload-label', text: '扩展' });
+                extSection.createSpan({ cls: 'pi-reload-count', text: String(extInfo.length) });
+                const itemsWrap = el.createDiv({ cls: 'pi-reload-items' });
+                for (const e of extInfo) {
+                    const itemEl = itemsWrap.createSpan({ cls: 'pi-reload-item' });
+                    itemEl.setText(e.name);
+                    if (e.commandNames.length === 0) {
+                        itemEl.addClass('pi-reload-item-no-cmd');
+                    }
+                }
+            }
+
+            // ── 其他分组（prompts、skills 等） ──
             for (const key of order) {
+                if (key === 'extension') continue;
                 const items = groups.get(key);
                 if (!items || items.length === 0) continue;
                 this.renderReloadGroup(el, labels[key] || key, items, oldNames, removedNames);
@@ -719,6 +758,7 @@ export class PiChatView extends ItemView {
         // 保存新数据供下次对比
         this.previousCmdNames = new Set(cmds.map((c: any) => c.name));
         this.previousCmdList = cmds.map((c: any) => ({ name: c.name, source: c.source || 'other' }));
+        this.lastRawCommands = cmds;
     }
 
     // ── /reload 失败回退：显示缓存数据 ──
@@ -815,5 +855,32 @@ export class PiChatView extends ItemView {
             .filter((c: any) => c.type === 'text')
             .map((c: any) => c.text || '')
             .join('\n');
+    }
+
+    // ── 构建扩展发现扫描目录列表 ──────────────
+    private buildScanDirs(): string[] {
+        const dirs: string[] = [
+            path.join(this.vaultPath, '.pi', 'extensions'),
+            path.join(this.vaultPath, '.pi', 'agent', 'extensions'),
+        ];
+        // 用户配置的额外扩展路径（逗号分隔，相对 vault 根）
+        const extra = this.settings.extensionPaths;
+        if (extra) {
+            for (const p of extra.split(',')) {
+                const trimmed = p.trim();
+                if (trimmed) {
+                    dirs.push(path.resolve(this.vaultPath, trimmed));
+                }
+            }
+        }
+        return dirs;
+    }
+
+    // ── 发现扩展信息（磁盘扫描 + commands 交叉引用） ──
+    private buildExtensionInfo(): ExtensionInfo[] {
+        return discoverExtensions(
+            this.lastRawCommands,
+            this.buildScanDirs(),
+        );
     }
 }

@@ -498,6 +498,12 @@ If your plugin does not need CSS, delete this file.
     vertical-align: super;
 }
 
+/* 无命令的扩展（仅事件钩子，不注册 / 命令） */
+.pi-reload-item-no-cmd {
+    opacity: 0.6;
+    font-style: italic;
+}
+
 /* ── 已移除分组标题（红色调） ── */
 .pi-reload-section-removed .pi-reload-label {
     color: var(--color-red);

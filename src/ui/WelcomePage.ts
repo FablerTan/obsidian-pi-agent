@@ -1,6 +1,7 @@
 // 欢迎页 — 首次对话前显示上下文文件、扩展/模板/技能列表
 import { App, setIcon, FileSystemAdapter } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
+import { ExtensionInfo } from '../utils/extension-loader';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -30,7 +31,8 @@ export class WelcomePage {
     }
 
     // ── 加载数据 ────────────────────────────────
-    async loadData(): Promise<void> {
+    // extensions: 磁盘扫描 + commands 交叉引用的扩展列表（含无命令的扩展）
+    async loadData(extensions?: ExtensionInfo[]): Promise<void> {
         const sectionsEl = this.el?.querySelector('.pi-welcome-sections') as HTMLElement | null;
         if (!sectionsEl) return;
 
@@ -44,17 +46,24 @@ export class WelcomePage {
             this.addSection(sectionsEl, 'file-text', 'Context', contextFiles);
         }
 
+        // ── 扩展：用磁盘扫描结果展示（含无命令的扩展） ──
+        if (extensions && extensions.length > 0) {
+            const extNames = extensions.map(e => e.name);
+            this.addSection(sectionsEl, 'puzzle', 'Extensions', extNames);
+        }
+
+        // ── 其他分组（prompts、skills 等） ──
         if (cmdResp?.success && cmdResp.data?.commands) {
             const cmds: any[] = cmdResp.data.commands;
             const groups = new Map<string, { items: string[] }>();
             for (const c of cmds) {
                 const src = c.source || 'other';
+                if (src === 'extension') continue; // 扩展已用磁盘扫描展示
                 if (!groups.has(src)) groups.set(src, { items: [] });
                 groups.get(src)!.items.push(c.name);
             }
 
             const order: Array<{ key: string; icon: string; label: string }> = [
-                { key: 'extension', icon: 'puzzle', label: 'Extensions' },
                 { key: 'prompt', icon: 'file-plus', label: 'Prompts' },
                 { key: 'skill', icon: 'sparkles', label: 'Skills' },
             ];
