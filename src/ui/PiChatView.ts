@@ -875,9 +875,9 @@ export class PiChatView extends ItemView {
             for (const p of extra.split(',')) {
                 let trimmed = p.trim();
                 if (!trimmed) continue;
-                // 相对路径：剪掉前导 ../（旧基点 vault 根的残留前缀）
+                // 相对路径：剪掉前导 ../ 和 .pi/（旧基点残留，当前基点已是 .pi/）
                 if (!path.isAbsolute(trimmed) && !trimmed.startsWith('~')) {
-                    trimmed = trimmed.replace(/^(\.\.\/)+/, '').replace(/^\.\//, '');
+                    trimmed = trimmed.replace(/^(\.\.\/)+/, '').replace(/^\.pi\//, '').replace(/^\.\//, '');
                 }
                 dirs.push(path.resolve(piBase, trimmed));
             }
