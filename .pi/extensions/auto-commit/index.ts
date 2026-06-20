@@ -4,7 +4,7 @@ import { execSync } from "node:child_process";
 const FILE_TOOLS = ["write", "edit"];
 const MUTATING_CMDS = ["rm ", "mv ", "cp ", "mkdir ", "touch "];
 
-const script = "extensions/auto-commit/commit.sh";
+const script = ".pi/extensions/auto-commit/commit.sh";
 
 export default function (pi: ExtensionAPI) {
   let modified = false;
@@ -37,10 +37,14 @@ export default function (pi: ExtensionAPI) {
       ).trim();
       if (!status) return;
 
+      // 先 add 再取 diff，确保新文件和未跟踪变更都被捕获
+      execSync("git add -A", { stdio: "pipe" });
+
       const diff = execSync(
-        "git -c core.quotePath=false diff --stat",
+        "git -c core.quotePath=false diff --cached --stat",
         { encoding: "utf-8", stdio: "pipe" }
       ).trim();
+      if (!diff) return;
 
       const output = execSync(
         `"${script}" "${diff.replace(/"/g, '\\"')}"`,
