@@ -873,10 +873,13 @@ export class PiChatView extends ItemView {
         if (extra) {
             const piBase = path.join(this.vaultPath, '.pi');
             for (const p of extra.split(',')) {
-                const trimmed = p.trim();
-                if (trimmed) {
-                    dirs.push(path.resolve(piBase, trimmed));
+                let trimmed = p.trim();
+                if (!trimmed) continue;
+                // 相对路径：剪掉前导 ../（旧基点 vault 根的残留前缀）
+                if (!path.isAbsolute(trimmed) && !trimmed.startsWith('~')) {
+                    trimmed = trimmed.replace(/^(\.\.\/)+/, '').replace(/^\.\//, '');
                 }
+                dirs.push(path.resolve(piBase, trimmed));
             }
         }
         return dirs;
