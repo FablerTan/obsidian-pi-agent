@@ -1,10 +1,14 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
 const FILE_TOOLS = ["write", "edit"];
 const MUTATING_CMDS = ["rm ", "mv ", "cp ", "mkdir ", "touch "];
 
-const script = ".pi/extensions/auto-commit/commit.sh";
+// 脚本路径 = 当前扩展所在目录 + commit.sh
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const script = join(__dirname, "commit.sh");
 
 export default function (pi: ExtensionAPI) {
   let modified = false;
