@@ -2,6 +2,8 @@
 
 对照 Pi RPC 协议文档（`pi --mode rpc`）与当前实现代码，整理出已处理和未处理的部分。
 
+> **说明**: `src/pi/types.ts` 已依据协议文档定义了全部事件/命令/响应类型（`PiEvent` / `AssistantMessageEvent` / `ExtensionUiRequest` / `PiResponse<T>`）。以下表格反映**运行时行为**，类型定义已全覆盖。
+
 ---
 
 ## 一、RPC 命令（插件 → pi）
@@ -11,24 +13,24 @@
 | 命令 | 位置 | 方式 |
 |------|------|------|
 | `prompt` | `rpc-client.ts` — `prompt()` | 直接发送 |
-| `abort` | `PiChatView.ts` — `abort()` | 直接发送 + UI 清理 |
+| `abort` | `PiChatView.ts` — `abort()` | 直接发送 + `resetTurnAndPhase()` |
 | `new_session` | `PiChatView.ts` — `handleNewSession()` | `sendAndWait` |
-| `get_state` | `rpc-client.ts` — `start()` 等待就绪；`InputStatusBar.ts` — 加载模型/思考层级 | `sendAndWait` |
-| `get_messages` | `HistoryPanel.ts` — `switchToSession()` / `loadMessages()` | `sendAndWait` |
-| `switch_session` | `HistoryPanel.ts` — `switchToSession()` | `sendAndWait` |
-| `get_commands` | `PiChatView.ts` — `loadCommands()` / `handleReload()` | `sendAndWait` |
-| `set_model` | `InputStatusBar.ts` — `selectModel()` | `sendAndWait` |
-| `get_available_models` | `InputStatusBar.ts` — `openModelPicker()` | `sendAndWait` |
-| `cycle_thinking_level` | `InputStatusBar.ts` — `cycleThinking()` | `sendAndWait` |
+| `get_state` | `rpc-client.ts` — `start()` 等待就绪；`InputStatusBar.ts` — 加载模型/思考层级 | `sendAndWait<GetStateData>` |
+| `get_messages` | `HistoryPanel.ts` — `switchToSession()` / `loadMessages()` | `sendAndWait<GetMessagesData>` |
+| `switch_session` | `HistoryPanel.ts` — `switchToSession()` | `sendAndWait<SwitchSessionData>` |
+| `get_commands` | `ReloadService.ts` — `loadCommands()` / `run()` | `sendAndWait<GetCommandsData>` |
+| `set_model` | `InputStatusBar.ts` — `selectModel()` | `sendAndWait<Model>` |
+| `get_available_models` | `InputStatusBar.ts` — `openModelPicker()` | `sendAndWait<GetAvailableModelsData>` |
+| `cycle_thinking_level` | `InputStatusBar.ts` — `cycleThinking()` | `sendAndWait<CycleThinkingLevelData>` |
 | `compact` | `PiChatView.ts` — `handleCompact()` | 直接发送 |
-| `get_session_stats` | `InputStatusBar.ts` — `updateContextUsage()` + `PiChatView.ts` — `/stats` | `sendAndWait` |
+| `set_auto_compaction` | `rpc-client.ts` — `setAutoCompaction()` | `sendAndWait` |
+| `get_session_stats` | `InputStatusBar.ts` — `updateContextUsage()` + `StatsService.run()` | `sendAndWait<GetSessionStatsData>` |
 | `extension_ui_response` | `rpc-client.ts` — `sendExtensionUIResponse()` | 直接发送 |
 
 ### ❌ 未实现的命令
 
 | 命令 | 作用 | 优先级 | 备注 |
 |------|------|--------|------|
-| `set_auto_compaction` | 开启/关闭自动压缩 | ⭐ 高 | 需要设置页面 |
 | `bash` | 直接执行 shell 命令并加入对话上下文 | 中 | |
 | `set_auto_retry` | 开启/关闭自动重试 | 中 | |
 | `fork` | 从某条消息创建分叉新会话 | 中 | |
@@ -56,28 +58,28 @@
 
 | 事件 / 子事件 | 位置 | 行为 |
 |------|------|------|
-| `agent_start` | `PiChatView.handlePiEvent()` | `isAgentActive = true` + 显示加载动画 |
-| `agent_end` | `PiChatView.handlePiEvent()` | `isAgentActive = false` + 清理状态 + 更新 Token 用量 |
-| `compaction_start` | `PiChatView.handlePiEvent()` | 显示「正在压缩…」系统消息 |
-| `compaction_end` | `PiChatView.handlePiEvent()` | 更新消息为完成/取消/失败 |
-| `message_update.text_delta` | `PiChatView.handlePiEvent()` | 追加助手文字 |
-| `message_update.text_start` | `PiChatView.handlePiEvent()` | 初始化 MarkdownMsg |
-| `message_update.thinking_start` | `PiChatView.handlePiEvent()` | 创建 ThinkingBlock |
-| `message_update.thinking_delta` | `PiChatView.handlePiEvent()` | 追加思考内容 |
-| `message_update.thinking_end` | `PiChatView.handlePiEvent()` | 完成思考块 |
+| `agent_start` | `PiChatView.handlePiEvent()` | `phase = thinking` + `new TurnContext` + `showLoading` |
+| `agent_end` | `PiChatView.handlePiEvent()` | `resetTurnAndPhase()` + Token 用量更新 |
+| `compaction_start` | `PiChatView.handlePiEvent()` | `isCompacting = true` + 系统消息「正在压缩」 |
+| `compaction_end` | `PiChatView.handlePiEvent()` | `isCompacting = false` + 更新为完成/取消/失败 |
+| `message_update.text_delta` | `PiChatView.handlePiEvent()` | → `TurnContext.appendText` → `AssistantMessageView.appendText` |
+| `message_update.text_start` | `PiChatView.handlePiEvent()` | → `TurnContext.ensureTextContainer` |
+| `message_update.thinking_start` | `PiChatView.handlePiEvent()` | → `TurnContext.startThinking` |
+| `message_update.thinking_delta` | `PiChatView.handlePiEvent()` | → `TurnContext.appendThinking` |
+| `message_update.thinking_end` | `PiChatView.handlePiEvent()` | → `TurnContext.endThinking` |
 | `message_update.toolcall_start` | `PiChatView.handlePiEvent()` | 隐藏加载动画 |
-| `tool_execution_start` | `PiChatView.handlePiEvent()` | 创建 ToolCallMsg 卡片 |
-| `tool_execution_update` | `PiChatView.handlePiEvent()` | 更新执行输出 |
-| `tool_execution_end` | `PiChatView.handlePiEvent()` | 标记完成/失败 |
-| `extension_ui_request` | `PiChatView.handlePiEvent()` | 转给 `ExtensionUIHandler.handleRequest()` |
-| `extension_error` | `PiChatView.handlePiEvent()` | 显示 Notice |
-| `error` | `PiChatView.handlePiEvent()` | 显示 Notice |
+| `tool_execution_start` | `PiChatView.handlePiEvent()` | → `TurnContext.addToolCall` |
+| `tool_execution_update` | `PiChatView.handlePiEvent()` | → `TurnContext.updateToolCall` |
+| `tool_execution_end` | `PiChatView.handlePiEvent()` | → `TurnContext.endToolCall` |
+| `extension_ui_request` | `PiChatView.handlePiEvent()` | → `ExtensionUIHandler.handleRequest` |
+| `extension_error` | `PiChatView.handlePiEvent()` | `resetTurnAndPhase()` + 显示具体错误 |
+| `error` | `PiChatView.handlePiEvent()` | `resetTurnAndPhase()` + 显示具体消息 |
 
 ### ❌ 未处理的事件
 
 | 事件 | 用途 | 影响 |
 |------|------|------|
-| `turn_start` / `turn_end` | 一个回合开始/完成（含助手回复 + 工具结果） | 无法精确追踪回合边界 |
+| `turn_start` / `turn_end` | 一个回合开始/完成 | 无法精确追踪回合边界 |
 | `message_start` / `message_end` | 一条消息开始/完成 | 无法获取完整消息对象 |
 | `auto_retry_start` / `auto_retry_end` | 自动重试开始/完成 | 用户不知道在重试 |
 | `message_update.toolcall_delta` | 工具调用参数流式到达 | 无法实时显示参数构建过程 |
@@ -110,6 +112,9 @@
 | `setTitle` | 广播型 | 聊天面板 header |
 | `set_editor_text` | 广播型 | 输入框 |
 
+所有方法已使用 TypeScript discriminated union（`ExtensionUiRequest`），
+`handleRequest(event: ExtensionUiRequest)` switch 获得 narrowing。
+
 ---
 
 ## 优先级总结
@@ -117,6 +122,6 @@
 | 层级 | 内容 | 状态 |
 |------|------|------|
 | 🚨 P0 | Extension UI 协议 | ✅ 已完成 |
-| 🔴 P1 | 漏掉的关键事件（`auto_retry_*`、`message_update` 子事件、`turn_*`） | 待做 |
-| 🟡 P2 | 有用的命令（`set_auto_compaction`、`bash`、`set_auto_retry`） | 待做 |
+| 🔴 P1 | 漏掉的关键事件（`auto_retry_*`、`message_update` 子事件、`turn_*`） | 待做（类型已定义，运行时未处理） |
+| 🟡 P2 | 有用的命令（`bash`、`set_auto_retry`） | 待做 |
 | 🟢 P3 | 锦上添花（`fork`/`clone`、`export_html`、`session_name` 等） | 待做 |
