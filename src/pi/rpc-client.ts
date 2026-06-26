@@ -1,5 +1,6 @@
 // child_process: Node.js 内置模块，用来启动和管理子进程
 import { spawn, ChildProcess } from 'child_process';
+import type { PiEvent, PiResponse } from './types';
 
 // ── RPC 传输错误 ────────────────────────────────
 // sendAndWait 在「传输层」失败时 reject 这些错误；
@@ -35,14 +36,14 @@ export class PiRpcClient {
 
     // ── 事件订阅 ────────────────────────────────
     // 支持多个订阅者，订阅返回取消订阅函数
-    private eventHandlers = new Set<(event: any) => void>();
+    private eventHandlers = new Set<(event: PiEvent) => void>();
     private disconnectHandlers = new Set<(reason: DisconnectReason) => void>();
 
     // ── 挂起的请求 ──────────────────────────────
     // key=请求ID, value=回调 + 超时定时器
     private pendingRequests: Map<
         string,
-        { resolve: (resp: any) => void; reject: (err: Error) => void; timer: number | null }
+        { resolve: (resp: PiResponse<any>) => void; reject: (err: Error) => void; timer: number | null }
     > = new Map();
 
     // 自增 ID 计数器
@@ -62,7 +63,7 @@ export class PiRpcClient {
 
     // ── 订阅 pi 事件 ────────────────────────────
     // 多个视图可同时订阅；返回取消订阅函数，视图 onClose 时调用
-    on(handler: (event: any) => void): () => void {
+    on(handler: (event: PiEvent) => void): () => void {
         this.eventHandlers.add(handler);
         return () => this.eventHandlers.delete(handler);
     }
@@ -194,12 +195,12 @@ export class PiRpcClient {
     // ── 发送命令并等待响应 ──────────────────────
     // 传输层失败（pi 未运行 / 超时 / 进程退出）时 reject PiRpcError；
     // pi 正常返回的 response（含 success:false）走 resolve，由调用方判断
-    sendAndWait(
+    sendAndWait<T = unknown>(
         command: object,
         opts: { timeoutMs?: number } = {},
-    ): Promise<any> {
+    ): Promise<PiResponse<T>> {
         const timeoutMs = opts.timeoutMs ?? this.defaultTimeoutMs;
-        return new Promise((resolve, reject) => {
+        return new Promise<PiResponse<T>>((resolve, reject) => {
             let id: string | null = null;
 
             // 超时定时器：到点后从 pending 移除并 reject
@@ -228,12 +229,12 @@ export class PiRpcClient {
     }
 
     // ── 获取会话统计（token 用量、费用等） ─────
-    getSessionStats(): Promise<any> {
+    getSessionStats(): Promise<PiResponse<import('./types').GetSessionStatsData>> {
         return this.sendAndWait({ type: 'get_session_stats' });
     }
 
     // ── 设置自动压缩 ───────────────────────────
-    setAutoCompaction(enabled: boolean): Promise<any> {
+    setAutoCompaction(enabled: boolean): Promise<PiResponse> {
         this._autoCompaction = enabled;
         return this.sendAndWait({ type: 'set_auto_compaction', enabled });
     }
@@ -270,14 +271,16 @@ export class PiRpcClient {
     }
 
     // ── 处理收到的事件 ──────────────────────────
-    private handleEvent(event: any): void {
-        // 如果是 response 类型且有对应的 pending 请求，走请求回调
-        if (event.type === 'response' && event.id) {
-            const entry = this.pendingRequests.get(event.id);
+    private handleEvent(event: PiEvent): void {
+        // response 是命令回执，不属于 PiEvent 联合；这里宽松处理：
+        // 带 id 的 response 走 pending 请求回调，其余按事件广播给订阅者
+        const raw = event as unknown as { type: string; id?: string };
+        if (raw.type === 'response' && raw.id) {
+            const entry = this.pendingRequests.get(raw.id);
             if (entry) {
-                this.pendingRequests.delete(event.id);
+                this.pendingRequests.delete(raw.id);
                 if (entry.timer) window.clearTimeout(entry.timer);
-                entry.resolve(event);
+                entry.resolve(event as unknown as PiResponse<any>);
                 return;
             }
         }
@@ -286,7 +289,7 @@ export class PiRpcClient {
     }
 
     // ── 广播事件给所有订阅者 ───────────────────
-    private emitEvent(event: any): void {
+    private emitEvent(event: PiEvent): void {
         for (const h of this.eventHandlers) {
             try {
                 h(event);

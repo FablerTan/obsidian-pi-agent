@@ -7,6 +7,18 @@
 //   直接执行对应操作
 import { App, Notice } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
+import type {
+    ExtensionUiRequest,
+    SelectRequest,
+    ConfirmRequest,
+    InputRequest,
+    EditorRequest,
+    NotifyRequest,
+    SetStatusRequest,
+    SetWidgetRequest,
+    SetTitleRequest,
+    SetEditorTextRequest,
+} from '../pi/types';
 
 export class ExtensionUIHandler {
     // 当前内联对话框的 DOM 元素（不存在时为 null）
@@ -21,9 +33,8 @@ export class ExtensionUIHandler {
     ) {}
 
     // ── 统一入口：根据 method 分派到具体的处理方法 ──
-    handleRequest(event: any): void {
-        const { method } = event;
-        switch (method) {
+    handleRequest(event: ExtensionUiRequest): void {
+        switch (event.method) {
             case 'select':   this.handleSelect(event); break;
             case 'confirm':  this.handleConfirm(event); break;
             case 'input':    this.handleInput(event); break;
@@ -34,7 +45,7 @@ export class ExtensionUIHandler {
             case 'setTitle':       this.handleSetTitle(event); break;
             case 'set_editor_text': this.handleSetEditorText(event); break;
             default:
-                console.warn('未知的 Extension UI 方法:', method);
+                console.warn('未知的 Extension UI 方法:', (event as { method: string }).method);
         }
     }
 
@@ -43,7 +54,7 @@ export class ExtensionUIHandler {
     // ══════════════════════════════════════════════
 
     // ── select：选项列表 ────────────────────────
-    private handleSelect(request: any): void {
+    private handleSelect(request: SelectRequest): void {
         this.showDialog((el) => {
             // 标题
             el.createDiv({
@@ -70,7 +81,7 @@ export class ExtensionUIHandler {
     }
 
     // ── confirm：确认/取消 ──────────────────────
-    private handleConfirm(request: any): void {
+    private handleConfirm(request: ConfirmRequest): void {
         this.showDialog((el) => {
             el.createDiv({
                 cls: 'pi-ext-inline-title',
@@ -110,7 +121,7 @@ export class ExtensionUIHandler {
     }
 
     // ── input：单行输入 ────────────────────────
-    private handleInput(request: any): void {
+    private handleInput(request: InputRequest): void {
         this.showDialog((el) => {
             el.createDiv({
                 cls: 'pi-ext-inline-title',
@@ -153,7 +164,7 @@ export class ExtensionUIHandler {
     }
 
     // ── editor：多行编辑 ────────────────────────
-    private handleEditor(request: any): void {
+    private handleEditor(request: EditorRequest): void {
         this.showDialog((el) => {
             el.createDiv({
                 cls: 'pi-ext-inline-title',
@@ -245,7 +256,7 @@ export class ExtensionUIHandler {
     // ══════════════════════════════════════════════
 
     // ── notify：显示通知 ───────────────────────
-    private handleNotify(request: any): void {
+    private handleNotify(request: NotifyRequest): void {
         const { message, notifyType } = request;
         if (!message) return;
         const notice = new Notice(message, 5000);
@@ -260,7 +271,7 @@ export class ExtensionUIHandler {
     // ── setStatus：设置/清除状态栏文字 ─────────
     private statusMap = new Map<string, string>();
 
-    private handleSetStatus(request: any): void {
+    private handleSetStatus(request: SetStatusRequest): void {
         const { statusKey, statusText } = request;
         if (statusText === undefined || statusText === null) {
             this.statusMap.delete(statusKey);
@@ -316,7 +327,7 @@ export class ExtensionUIHandler {
         placement: string;
     }>();
 
-    private handleSetWidget(request: any): void {
+    private handleSetWidget(request: SetWidgetRequest): void {
         const { widgetKey, widgetLines, widgetPlacement } = request;
         if (widgetLines === undefined || widgetLines === null) {
             this.widgetMap.delete(widgetKey);
@@ -388,7 +399,7 @@ export class ExtensionUIHandler {
     }
 
     // ── setTitle ─────────────────────────────────
-    private handleSetTitle(request: any): void {
+    private handleSetTitle(request: SetTitleRequest): void {
         const { title } = request;
         if (title) {
             document.title = title;
@@ -396,7 +407,7 @@ export class ExtensionUIHandler {
     }
 
     // ── set_editor_text ──────────────────────────
-    private handleSetEditorText(request: any): void {
+    private handleSetEditorText(request: SetEditorTextRequest): void {
         const { text } = request;
         if (text !== undefined && text !== null) {
             this.textarea.value = text;

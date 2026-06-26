@@ -4,6 +4,7 @@ import { PiRpcClient } from '../pi/rpc-client';
 import { ExtensionInfo } from '../utils/extension-loader';
 import * as fs from 'fs';
 import * as path from 'path';
+import type { GetCommandsData } from '../pi/types';
 
 export class WelcomePage {
     el!: HTMLElement;
@@ -38,7 +39,7 @@ export class WelcomePage {
 
         const [contextFiles, cmdResp] = await Promise.all([
             this.readContextFiles(),
-            this.piClient.sendAndWait({ type: 'get_commands' }).catch(() => null),
+            this.piClient.sendAndWait<GetCommandsData>({ type: 'get_commands' }).catch(() => null),
         ]);
 
         // Context 文件

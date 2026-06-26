@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { PiRpcClient } from '../pi/rpc-client';
 import { extractTextContent } from '../utils/helpers';
+import type { SwitchSessionData, GetMessagesData } from '../pi/types';
 import { ToolCallMsg } from './ToolCallMsg';
 
 export class HistoryPanel {
@@ -139,9 +140,9 @@ export class HistoryPanel {
     private async switchToSession(sessionPath: string): Promise<void> {
         new Notice('正在切换会话...');
 
-        let switchResp: any;
+        let switchResp: { success: boolean; data?: SwitchSessionData; error?: string } | undefined;
         try {
-            switchResp = await this.piClient.sendAndWait({
+            switchResp = await this.piClient.sendAndWait<SwitchSessionData>({
                 type: 'switch_session',
                 sessionPath,
             });
@@ -155,9 +156,9 @@ export class HistoryPanel {
             return;
         }
 
-        let msgResp: any;
+        let msgResp: { success: boolean; data?: GetMessagesData; error?: string } | undefined;
         try {
-            msgResp = await this.piClient.sendAndWait({
+            msgResp = await this.piClient.sendAndWait<GetMessagesData>({
                 type: 'get_messages',
             });
         } catch (e) {
@@ -170,7 +171,7 @@ export class HistoryPanel {
             return;
         }
 
-        this.loadMessages(msgResp.data.messages || []);
+        this.loadMessages(msgResp.data?.messages || []);
     }
 
     // ── 增强代码块（同 MarkdownMsg 中的逻辑） ──

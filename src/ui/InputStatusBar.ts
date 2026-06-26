@@ -3,6 +3,7 @@
 // 点击思考层级 → 循环切换
 import { setIcon, Notice } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
+import type { GetStateData, GetAvailableModelsData, CycleThinkingLevelData, Model } from '../pi/types';
 
 // 思考层级缩写
 const THINKING_LABELS: Record<string, string> = {
@@ -80,7 +81,7 @@ export class InputStatusBar {
     // ── 加载当前状态 ──────────────────────────
     private async loadState(): Promise<void> {
         try {
-            const resp = await this.piClient.sendAndWait({ type: 'get_state' });
+            const resp = await this.piClient.sendAndWait<GetStateData>({ type: 'get_state' });
             if (resp?.success && resp.data) {
                 this.applyState(resp.data);
             }
@@ -90,7 +91,7 @@ export class InputStatusBar {
     // ── 应用状态到 UI ─────────────────────────
     // data 可能来自 get_state/cycle_model: { model: {...}, thinkingLevel: '...' }
     // 也可能来自 set_model: Model 对象直接 { name: '...', id: '...', ... }
-    private applyState(data: any): void {
+    private applyState(data: GetStateData | { model?: any; thinkingLevel?: string } | any): void {
         const model = data.model || data;
         const modelName = model?.name || model?.id || '未知';
         const thinkingLevel = data.thinkingLevel || '';
@@ -114,7 +115,7 @@ export class InputStatusBar {
 
         let models: any[] = [];
         try {
-            const resp = await this.piClient.sendAndWait({ type: 'get_available_models' });
+            const resp = await this.piClient.sendAndWait<GetAvailableModelsData>({ type: 'get_available_models' });
             if (resp?.success && resp.data?.models) {
                 models = resp.data.models;
             }
@@ -175,7 +176,7 @@ export class InputStatusBar {
     private async selectModel(model: any): Promise<void> {
         this.closeDropdown();
         try {
-            const resp = await this.piClient.sendAndWait({
+            const resp = await this.piClient.sendAndWait<Model>({
                 type: 'set_model',
                 provider: model.provider,
                 modelId: model.id,
@@ -226,7 +227,7 @@ export class InputStatusBar {
     // ── 循环切换思考层级 ──────────────────────
     private async cycleThinking(): Promise<void> {
         try {
-            const resp = await this.piClient.sendAndWait({ type: 'cycle_thinking_level' });
+            const resp = await this.piClient.sendAndWait<CycleThinkingLevelData>({ type: 'cycle_thinking_level' });
             if (resp?.success && resp.data) {
                 this.state.thinkingLevel = resp.data.level;
                 this.render();

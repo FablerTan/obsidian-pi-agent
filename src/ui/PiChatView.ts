@@ -15,6 +15,8 @@ import { ThinkingBlock } from './ThinkingBlock';
 import { ExtensionUIHandler } from './ExtensionUIHandler';
 import { PiChatSettings } from '../settings';
 import { discoverExtensions, ExtensionInfo } from '../utils/extension-loader';
+import type { PiEvent, GetCommandsData } from '../pi/types';
+import { extractText } from '../pi/types';
 
 // 视图的唯一标识符，用来注册和查找这个视图
 export const PI_CHAT_VIEW_TYPE = 'pi-chat-view';
@@ -336,7 +338,7 @@ export class PiChatView extends ItemView {
     }
 
     // ── 处理 pi 事件 ──────────────────────────
-    private handlePiEvent(event: any): void {
+    private handlePiEvent(event: PiEvent): void {
         switch (event.type) {
             case 'message_update': {
                 const delta = event.assistantMessageEvent;
@@ -385,7 +387,7 @@ export class PiChatView extends ItemView {
             case 'tool_execution_update': {
                 const card = this.toolCalls.get(event.toolCallId);
                 if (card) {
-                    const text = this.extractTextFromContent(event.partialResult?.content);
+                    const text = extractText(event.partialResult?.content);
                     if (text) card.setOutput(text);
                     this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
                 }
@@ -417,18 +419,26 @@ export class PiChatView extends ItemView {
                 this.inputStatusBar.updateContextUsage();
                 break;
             }
-            case 'extension_error':
+            case 'extension_error': {
+                this.hideLoading();
+                this.currentMarkdown = null;
+                this.currentAssistantEl = null;
+                this.thinkingBlock = null;
+                this.toolCalls.clear();
+                const detail = event.error
+                    ? `扩展错误 (${event.event ?? ''}): ${event.error}`
+                    : 'Pi 扩展发生错误';
+                new Notice(detail);
+                break;
+            }
             case 'error': {
                 this.hideLoading();
                 this.currentMarkdown = null;
                 this.currentAssistantEl = null;
                 this.thinkingBlock = null;
                 this.toolCalls.clear();
-                new Notice('Pi 返回了错误');
-                break;
-            }
-            case 'queue_update': {
-                // 插件侧无需主动处理排队状态
+                const msg = event.message ?? 'Pi 返回了错误';
+                new Notice(typeof msg === 'string' ? msg : 'Pi 返回了错误');
                 break;
             }
             case 'compaction_start': {
@@ -500,6 +510,15 @@ export class PiChatView extends ItemView {
                 this.extUiHandler?.handleRequest(event);
                 break;
             }
+            // 以下事件暂未处理（详见 docs/rpc-gaps.md）
+            case 'turn_start':
+            case 'turn_end':
+            case 'message_start':
+            case 'message_end':
+            case 'queue_update':
+            case 'auto_retry_start':
+            case 'auto_retry_end':
+                break;
         }
     }
 
@@ -521,7 +540,7 @@ export class PiChatView extends ItemView {
     // ── 从 Pi 加载可用命令列表 ────────────────
     private async loadCommands(): Promise<void> {
         try {
-            const resp = await this.piClient.sendAndWait({ type: 'get_commands' });
+            const resp = await this.piClient.sendAndWait<GetCommandsData>({ type: 'get_commands' });
             if (resp?.success && resp.data?.commands) {
                 const builtins = [
                     { name: 'new', description: '新建会话', source: 'extension' as const },
@@ -548,7 +567,7 @@ export class PiChatView extends ItemView {
         this.commandMenu.hide();
         this.textarea.value = '';
         try {
-            const resp = await this.piClient.sendAndWait({ type: 'new_session' });
+            const resp = await this.piClient.sendAndWait<{ cancelled: boolean }>({ type: 'new_session' });
             if (resp?.success) {
                 this.messagesEl.empty();
                 this.currentMarkdown = null;
@@ -682,7 +701,7 @@ export class PiChatView extends ItemView {
                 if (attempt > 0) {
                     await new Promise(r => setTimeout(r, 800));
                 }
-                const resp = await this.piClient.sendAndWait({ type: 'get_commands' });
+                const resp = await this.piClient.sendAndWait<GetCommandsData>({ type: 'get_commands' });
                 if (resp?.success && resp.data?.commands) {
                     cmds = resp.data.commands;
                     break;
@@ -807,7 +826,7 @@ export class PiChatView extends ItemView {
     // ── 从当前 pi 进程获取命令列表作为对比基准 ──
     private async fetchCurrentCmdNames(): Promise<Set<string>> {
         try {
-            const resp = await this.piClient.sendAndWait({ type: 'get_commands' });
+            const resp = await this.piClient.sendAndWait<GetCommandsData>({ type: 'get_commands' });
             if (resp?.success && resp.data?.commands) {
                 const cmds: any[] = resp.data.commands;
                 return new Set(cmds.map((c: any) => c.name));
@@ -875,12 +894,9 @@ export class PiChatView extends ItemView {
     }
 
     // ── 从 content 数组中提取纯文本 ────────────
-    private extractTextFromContent(content: any): string {
-        if (!Array.isArray(content)) return '';
-        return content
-            .filter((c: any) => c.type === 'text')
-            .map((c: any) => c.text || '')
-            .join('\n');
+    // 保留为私有方法供历史代码调用；新代码直接用 pi/types 的 extractText
+    private extractTextFromContent(content: unknown): string {
+        return extractText(content as any);
     }
 
     // ── 构建扩展扫描目录列表 ──
