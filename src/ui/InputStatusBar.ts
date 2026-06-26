@@ -30,9 +30,10 @@ export class InputStatusBar {
     private thinkingEl: HTMLElement;
     private contextEl: HTMLElement;
     private dropdownEl: HTMLElement | null = null;
-    private state: { modelName: string; thinkingLevel: string } = {
+    private state: { modelName: string; thinkingLevel: string; modelProvider: string } = {
         modelName: '加载中…',
         thinkingLevel: '',
+        modelProvider: '',
     };
 
     // 存储 activeDocument 点击处理器引用，供 destroy 移除
@@ -99,7 +100,7 @@ export class InputStatusBar {
         const model = data.model || data;
         const modelName = model?.name || model?.id || '未知';
         const thinkingLevel = data.thinkingLevel || '';
-        this.state = { modelName, thinkingLevel };
+        this.state = { modelName, thinkingLevel, modelProvider: model?.provider || '' };
         this.render();
     }
 
@@ -147,7 +148,8 @@ export class InputStatusBar {
 
         for (const model of models) {
             const li = list.createEl('li', { cls: 'pi-model-item' });
-            const isCurrent = model.name === this.state.modelName || model.id === this.state.modelName;
+            const isCurrent = (model.name === this.state.modelName || model.id === this.state.modelName)
+                && model.provider === this.state.modelProvider;
             if (isCurrent) li.addClass('pi-model-item-current');
 
             // 提供商图标
@@ -188,6 +190,7 @@ export class InputStatusBar {
             if (resp?.success) {
                 // set_model 的 data 是 Model 对象直接（不含 thinkingLevel）
                 this.state.modelName = resp.data?.name || resp.data?.id || '未知';
+                this.state.modelProvider = resp.data?.provider || '';
                 this.render();
                 new Notice(`已切换到 ${model.name || model.id}`);
             } else {
