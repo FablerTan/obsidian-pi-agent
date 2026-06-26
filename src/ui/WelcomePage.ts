@@ -3,7 +3,7 @@ import { App, setIcon, FileSystemAdapter } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 import { ExtensionInfo } from '../utils/extension-loader';
 import { groupCommandsBySource } from './command-groups';
-import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 import * as path from 'path';
 import type { GetCommandsData } from '../pi/types';
 
@@ -76,7 +76,7 @@ export class WelcomePage {
         try {
             const vaultPath = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
             const agentDir = path.join(vaultPath, '.pi', 'agent');
-            const files = fs.readdirSync(agentDir);
+            const files = await fsPromises.readdir(agentDir);
             return files
                 .filter(f => f.endsWith('.md') || f.endsWith('.txt'))
                 .sort();

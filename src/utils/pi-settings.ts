@@ -1,5 +1,6 @@
 // ── 读写项目 .pi/settings.json ────────────────
 import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 import * as path from 'path';
 
 export interface PiCompactionSettings {
@@ -16,13 +17,13 @@ function readFullSettings(settingsPath: string): Record<string, any> {
 	}
 }
 
-// ── 写入指定位置的 settings.json ──
-function writeFullSettings(settingsPath: string, json: Record<string, any>): void {
+// ── 写入指定位置的 settings.json（异步） ──
+async function writeFullSettings(settingsPath: string, json: Record<string, any>): Promise<void> {
 	const dir = path.dirname(settingsPath);
 	if (!fs.existsSync(dir)) {
 		fs.mkdirSync(dir, { recursive: true });
 	}
-	fs.writeFileSync(settingsPath, JSON.stringify(json, null, 2) + '\n', 'utf-8');
+	await fsPromises.writeFile(settingsPath, JSON.stringify(json, null, 2) + '\n', 'utf-8');
 }
 
 /** 读取项目 .pi/settings.json 中的压缩阈值，没有则返回默认值 */
@@ -36,12 +37,12 @@ export function readCompactionSettings(projectPath: string): PiCompactionSetting
 	};
 }
 
-/** 写入压缩阈值到项目 .pi/settings.json */
-export function writeCompactionSettings(settings: PiCompactionSettings, projectPath: string): void {
+/** 写入压缩阈值到项目 .pi/settings.json（异步） */
+export async function writeCompactionSettings(settings: PiCompactionSettings, projectPath: string): Promise<void> {
 	const path_ = path.join(projectPath, '.pi', 'settings.json');
 	const json = readFullSettings(path_);
 	json.compaction = { ...json.compaction, ...settings };
-	writeFullSettings(path_, json);
+	await writeFullSettings(path_, json);
 }
 
 /** 读取项目级资源路径配置（.pi/settings.json） */
@@ -55,12 +56,12 @@ export function readResourcePaths(projectPath: string): { skills: string[]; prom
 	};
 }
 
-/** 写入资源路径配置到项目 .pi/settings.json */
-export function writeResourcePaths(projectPath: string, paths: { skills?: string[]; prompts?: string[]; extensions?: string[] }): void {
+/** 写入资源路径配置到项目 .pi/settings.json（异步） */
+export async function writeResourcePaths(projectPath: string, paths: { skills?: string[]; prompts?: string[]; extensions?: string[] }): Promise<void> {
 	const settingsPath = path.join(projectPath, '.pi', 'settings.json');
 	const json = readFullSettings(settingsPath);
 	if (paths.skills !== undefined) json.skills = paths.skills;
 	if (paths.prompts !== undefined) json.prompts = paths.prompts;
 	if (paths.extensions !== undefined) json.extensions = paths.extensions;
-	writeFullSettings(settingsPath, json);
+	await writeFullSettings(settingsPath, json);
 }

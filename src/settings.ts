@@ -106,7 +106,7 @@ export class PiChatSettingTab extends PluginSettingTab {
 						.onChange(async (value) => {
 							this.plugin.settings.skillPaths = value;
 							await this.plugin.saveSettings();
-							this.saveResourcePaths();
+							await this.saveResourcePaths();
 						}),
 				);
 
@@ -119,7 +119,7 @@ export class PiChatSettingTab extends PluginSettingTab {
 						.onChange(async (value) => {
 							this.plugin.settings.promptPaths = value;
 							await this.plugin.saveSettings();
-							this.saveResourcePaths();
+							await this.saveResourcePaths();
 						}),
 				);
 
@@ -132,7 +132,7 @@ export class PiChatSettingTab extends PluginSettingTab {
 						.onChange(async (value) => {
 							this.plugin.settings.extensionPaths = value;
 							await this.plugin.saveSettings();
-							this.saveResourcePaths();
+							await this.saveResourcePaths();
 						}),
 				);
 		}
@@ -146,8 +146,8 @@ export class PiChatSettingTab extends PluginSettingTab {
 					.setButtonText('保存')
 					.setCta()
 					.onClick(() => {
-						this.saveCompactionThresholds();
-						this.saveResourcePaths();
+						void this.saveCompactionThresholds();
+						void this.saveResourcePaths();
 						new Notice('已写入 ' + (this.projectPath || '') + '/.pi/settings.json');
 					}),
 			);
@@ -246,7 +246,7 @@ export class PiChatSettingTab extends PluginSettingTab {
 		// 用户填的是项目根目录相对路径，但 .pi/settings.json 中的路径
 		// 相对于 .pi/ 目录解析，所以前面加 ../ 修正
 		const toPiRelative = (v: string) => v.split(',').map(s => s.trim()).filter(Boolean).map(p => `../${p}`);
-		writeResourcePaths(this.projectPath, {
+		void writeResourcePaths(this.projectPath, {
 			skills: toPiRelative(this.plugin.settings.skillPaths),
 			prompts: toPiRelative(this.plugin.settings.promptPaths),
 			extensions: toPiRelative(this.plugin.settings.extensionPaths),
@@ -261,6 +261,6 @@ export class PiChatSettingTab extends PluginSettingTab {
 			const pct = s.compactionPercent / 100;
 			this.compactionThresholds.reserveTokens = Math.round(defaultWindow * (1 - pct));
 		}
-		writeCompactionSettings(this.compactionThresholds, this.projectPath);
+		void writeCompactionSettings(this.compactionThresholds, this.projectPath);
 	}
 }

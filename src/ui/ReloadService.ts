@@ -45,7 +45,7 @@ export class ReloadService {
     ) {}
 
     // ── 暴露给 WelcomePage 的扩展发现 ──────────
-    getExtensionInfo(): ExtensionInfo[] {
+    async getExtensionInfo(): Promise<ExtensionInfo[]> {
         return discoverExtensions(this.lastRawCommands, this.buildScanDirs());
     }
 
@@ -88,7 +88,7 @@ export class ReloadService {
             }
         }
         if (cmds) {
-            this.handleReloadSuccess(cmds, oldNames);
+            await this.handleReloadSuccess(cmds, oldNames);
         } else {
             // 失败回退：显示缓存数据
             this.handleReloadFallback(oldCmdList, oldNames);
@@ -96,11 +96,11 @@ export class ReloadService {
     }
 
     // ── /reload 成功：渲染命令列表 + 对比新增/移除 ──
-    private handleReloadSuccess(cmds: CommandInfo[], oldNames: Set<string>): void {
+    private async handleReloadSuccess(cmds: CommandInfo[], oldNames: Set<string>): Promise<void> {
         this.commandMenu.setCommands([...BUILTIN_COMMANDS, ...cmds]);
 
         // 扩展发现（磁盘扫描 + commands 交叉引用）
-        const extInfo = this.getExtensionInfo();
+        const extInfo = await this.getExtensionInfo();
 
         // 按 source 分组（排除 extension，扩展用磁盘扫描结果展示）
         const groups = groupCommandsBySource<CommandInfo>(cmds, { exclude: ['extension'] });

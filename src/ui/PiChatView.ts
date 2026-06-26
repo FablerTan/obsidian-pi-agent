@@ -273,7 +273,7 @@ export class PiChatView extends ItemView {
         await this.reloadService.loadCommands();
 
         // pi 就绪后再加载欢迎页数据（含扩展发现）
-        this.welcomePage.loadData(this.reloadService.getExtensionInfo());
+        this.welcomePage.loadData(await this.reloadService.getExtensionInfo());
     }
 
     async onClose(): Promise<void> {
@@ -516,7 +516,7 @@ export class PiChatView extends ItemView {
                 this.resetTurnAndPhase();
                 this.messagesEl.empty();
                 this.welcomePage = new WelcomePage(this.messagesEl, this.app, this.piClient);
-                this.welcomePage.loadData(this.reloadService.getExtensionInfo());
+                this.welcomePage.loadData(await this.reloadService.getExtensionInfo());
                 new Notice('已创建新会话');
             } else {
                 new Notice('新建会话失败');
