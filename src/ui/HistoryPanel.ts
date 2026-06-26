@@ -1,12 +1,12 @@
 // 历史会话底部浮层：读取、显示、切换历史会话
-import { Notice, setIcon, FileSystemAdapter, App, MarkdownRenderer } from 'obsidian';
+import { Notice, setIcon, FileSystemAdapter, App } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { PiRpcClient } from '../pi/rpc-client';
 import { extractText } from '../pi/types';
 import type { SwitchSessionData, GetMessagesData } from '../pi/types';
-import { ToolCallMsg } from './ToolCallMsg';
+import { AssistantMessageView } from './AssistantMessageView';
 import { enhanceCodeBlocks } from './code-blocks';
 
 export class HistoryPanel {
@@ -175,12 +175,10 @@ export class HistoryPanel {
         this.loadMessages(msgResp.data?.messages || []);
     }
 
-    // ── 增强代码块（委托公共工具，同 MarkdownMsg） ──
-    private enhanceCodeBlocks(container: HTMLElement): void {
-        enhanceCodeBlocks(container);
-    }
+    // ── 增强代码块由 code-blocks.ts 公共函数提供，直接调用 ──
 
     // ── 清空并加载消息 ──────────────────────────
+    // 与流式路径共用 AssistantMessageView，保证 DOM 结构一致
     private async loadMessages(messages: any[]): Promise<void> {
         this.messagesEl.empty();
 
@@ -190,13 +188,11 @@ export class HistoryPanel {
             cls: 'pi-chat-welcome',
         });
 
-        // 追踪工具调用卡片，按 toolCallId
-        const toolCallMap = new Map<string, ToolCallMsg>();
+        // toolCallId → 所属的 AssistantMessageView，用于路由后续 toolResult 消息
+        const toolCallOwners = new Map<string, AssistantMessageView>();
 
         const removeWelcome = () => {
-            if (welcomeEl) {
-                welcomeEl.remove();
-            }
+            if (welcomeEl) welcomeEl.remove();
         };
 
         for (const msg of messages) {
@@ -209,41 +205,28 @@ export class HistoryPanel {
                 }
             } else if (msg.role === 'assistant') {
                 const content = Array.isArray(msg.content) ? msg.content : [];
-
-                // 提取文本内容
-                const text = extractText(content as any);
-                // 提取工具调用
-                const toolCalls = content.filter((c: any) =>
-                    c.type === 'toolCall' || c.type === 'tool_use');
-
-                if (!text && toolCalls.length === 0) continue;
+                // 预检查是否有可见内容（原逻辑：无文本且无工具调用则跳过）
+                const hasText = content.some((c: any) => c.type === 'text' && c.text);
+                const hasTool = content.some((c: any) => c.type === 'toolCall');
+                const hasThinking = content.some((c: any) => c.type === 'thinking');
+                if (!hasText && !hasTool && !hasThinking) continue;
 
                 removeWelcome();
-                const el = this.messagesEl.createDiv({ cls: 'pi-chat-msg-assistant' });
-
-                // 渲染 Markdown 文字
-                if (text) {
-                    await MarkdownRenderer.render(this.app, text, el, '/', this.messagesEl as any);
-                    this.enhanceCodeBlocks(el);
-                }
-
-                // 渲染工具调用卡片
-                for (const tc of toolCalls) {
-                    const args = tc.input || tc.arguments || {};
-                    const toolName = tc.name || tc.toolName || '';
-                    const toolId = tc.id || '';
-
-                    const wrapper = el.createDiv({ cls: 'pi-chat-tool-wrapper' });
-                    const card = new ToolCallMsg(wrapper, toolName, args);
-                    toolCallMap.set(toolId, card);
-                }
+                const view = new AssistantMessageView(
+                    this.messagesEl, this.app, this.messagesEl as any,
+                    { onToolCall: (id) => toolCallOwners.set(id, view) },
+                );
+                view.renderFinal(msg);
+                // 统一增强代码块（MarkdownMsg 内部已增强，但 renderFinal 走的是同一路径，
+                // 这里冗余调用是 no-op：已增强的 pre 会被跳过）
+                enhanceCodeBlocks(view.element);
 
             } else if (msg.role === 'toolResult' || msg.role === 'tool_result') {
-                // 匹配对应的工具调用，填入结果
-                const card = toolCallMap.get(msg.toolCallId);
-                if (card) {
-                    card.setResult(msg, msg.isError || false);
-                    toolCallMap.delete(msg.toolCallId);
+                // 路由到工具调用所在的 view，填入结果
+                const owner = toolCallOwners.get(msg.toolCallId);
+                if (owner) {
+                    owner.applyToolResult(msg.toolCallId, msg, msg.isError || false);
+                    toolCallOwners.delete(msg.toolCallId);
                 }
             }
         }
