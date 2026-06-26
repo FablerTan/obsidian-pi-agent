@@ -2,6 +2,7 @@
 // 包含工具名称、参数摘要、执行状态、输出结果
 // 可点击头部切换三种状态：收起 → 限制5行 → 展开全部
 import { setIcon } from 'obsidian';
+import { extractText } from '../pi/types';
 
 // 工具名称到 Lucide 图标的映射
 const TOOL_ICONS: Record<string, string> = {
@@ -204,25 +205,16 @@ export class ToolCallMsg {
             this.statusIcon.addClass('pi-chat-tool-success');
         }
 
-        // 显示结果
+        // 显示结果：优先用 extractText 处理 content 数组，
+        // 再回退到 string / result.text（防御非标准结果）
         if (result) {
-            const text = this.extractResultText(result);
+            const text = extractText(result.content)
+                || (typeof result === 'string' ? result : '')
+                || (result.text ? String(result.text) : '');
             if (text) {
                 this.setOutput(text);
             }
         }
     }
 
-    // ── 从 result 对象里提取纯文本 ────────────
-    private extractResultText(result: any): string {
-        if (result.content && Array.isArray(result.content)) {
-            return result.content
-                .filter((c: any) => c.type === 'text')
-                .map((c: any) => c.text || '')
-                .join('\n');
-        }
-        if (typeof result === 'string') return result;
-        if (result.text) return result.text;
-        return '';
-    }
 }

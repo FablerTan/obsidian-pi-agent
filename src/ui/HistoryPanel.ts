@@ -4,9 +4,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { PiRpcClient } from '../pi/rpc-client';
-import { extractTextContent } from '../utils/helpers';
+import { extractText } from '../pi/types';
 import type { SwitchSessionData, GetMessagesData } from '../pi/types';
 import { ToolCallMsg } from './ToolCallMsg';
+import { enhanceCodeBlocks } from './code-blocks';
 
 export class HistoryPanel {
     constructor(
@@ -111,7 +112,7 @@ export class HistoryPanel {
                             const entry = JSON.parse(line);
                             if (entry.type === 'message' && entry.message?.role === 'user') {
                                 const rawContent = entry.message.content;
-                                const text = rawContent ? extractTextContent(rawContent) : '';
+                                const text = rawContent ? extractText(rawContent as any) : '';
                                 if (text) {
                                     firstMsg = text.length > 40 ? text.slice(0, 40) + '...' : text;
                                     break;
@@ -174,32 +175,9 @@ export class HistoryPanel {
         this.loadMessages(msgResp.data?.messages || []);
     }
 
-    // ── 增强代码块（同 MarkdownMsg 中的逻辑） ──
+    // ── 增强代码块（委托公共工具，同 MarkdownMsg） ──
     private enhanceCodeBlocks(container: HTMLElement): void {
-        container.querySelectorAll('pre').forEach((pre) => {
-            const code = pre.querySelector('code');
-            if (!code || pre.hasAttribute('data-enhanced')) return;
-            pre.setAttribute('data-enhanced', 'true');
-
-            const classNames = code.className || '';
-            const langMatch = classNames.match(/language-(\w+)/);
-            const lang = langMatch ? langMatch[1] || '' : 'code';
-
-            // 右上角语言标签，点击复制代码
-            const label = document.createElement('span');
-            label.className = 'pi-chat-code-lang';
-            label.textContent = lang;
-            label.title = '点击复制代码';
-            label.addEventListener('click', async () => {
-                const codeText = (code as HTMLElement).textContent || '';
-                try {
-                    await navigator.clipboard.writeText(codeText);
-                    label.textContent = '已复制 ✓';
-                    setTimeout(() => { label.textContent = lang; }, 2000);
-                } catch { new Notice('复制失败'); }
-            });
-            pre.appendChild(label);
-        });
+        enhanceCodeBlocks(container);
     }
 
     // ── 清空并加载消息 ──────────────────────────
@@ -223,7 +201,7 @@ export class HistoryPanel {
 
         for (const msg of messages) {
             if (msg.role === 'user') {
-                const text = extractTextContent(msg.content);
+                const text = extractText(msg.content as any);
                 if (text) {
                     removeWelcome();
                     const el = this.messagesEl.createDiv({ cls: 'pi-chat-msg-user' });
@@ -233,7 +211,7 @@ export class HistoryPanel {
                 const content = Array.isArray(msg.content) ? msg.content : [];
 
                 // 提取文本内容
-                const text = extractTextContent(content);
+                const text = extractText(content as any);
                 // 提取工具调用
                 const toolCalls = content.filter((c: any) =>
                     c.type === 'toolCall' || c.type === 'tool_use');

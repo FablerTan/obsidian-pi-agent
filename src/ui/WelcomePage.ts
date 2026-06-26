@@ -2,6 +2,7 @@
 import { App, setIcon, FileSystemAdapter } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 import { ExtensionInfo } from '../utils/extension-loader';
+import { groupCommandsBySource } from './command-groups';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { GetCommandsData } from '../pi/types';
@@ -56,27 +57,16 @@ export class WelcomePage {
         // ── 其他分组（prompts、skills 等） ──
         if (cmdResp?.success && cmdResp.data?.commands) {
             const cmds: any[] = cmdResp.data.commands;
-            const groups = new Map<string, { items: string[] }>();
-            for (const c of cmds) {
-                const src = c.source || 'other';
-                if (src === 'extension') continue; // 扩展已用磁盘扫描展示
-                if (!groups.has(src)) groups.set(src, { items: [] });
-                groups.get(src)!.items.push(c.name);
-            }
+            const groups = groupCommandsBySource<{ name: string }>(cmds, { exclude: ['extension'] });
 
-            const order: Array<{ key: string; icon: string; label: string }> = [
-                { key: 'prompt', icon: 'file-plus', label: 'Prompts' },
-                { key: 'skill', icon: 'sparkles', label: 'Skills' },
-            ];
-            for (const { key, icon, label } of order) {
-                const g = groups.get(key);
-                if (g) {
-                    this.addSection(sectionsEl, icon, label, g.items);
-                    groups.delete(key);
-                }
-            }
-            for (const [key, g] of groups) {
-                this.addSection(sectionsEl, 'terminal', key, g.items);
+            // source → 图标 / 标签（WelcomePage 用英文标签 + 图标）
+            const meta: Record<string, { icon: string; label: string }> = {
+                prompt: { icon: 'file-plus', label: 'Prompts' },
+                skill: { icon: 'sparkles', label: 'Skills' },
+            };
+            for (const { key, items } of groups) {
+                const m = meta[key] || { icon: 'terminal', label: key };
+                this.addSection(sectionsEl, m.icon, m.label, items.map(i => i.name));
             }
         }
     }

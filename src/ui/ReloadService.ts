@@ -13,6 +13,7 @@ import type { CommandInfo, GetCommandsData } from '../pi/types';
 import type { CommandMenu } from './CommandMenu';
 import type { SystemMessageRenderer } from './SystemMessageRenderer';
 import { discoverExtensions, ExtensionInfo } from '../utils/extension-loader';
+import { groupCommandsBySource, sourceLabel } from './command-groups';
 import type { PiChatSettings } from '../settings';
 
 // 内置命令（插件自身提供的伪命令，注入到命令菜单中）
@@ -24,13 +25,8 @@ const BUILTIN_COMMANDS = [
     { name: 'stats', description: '查看 Token 用量统计', source: 'extension' as const },
 ];
 
-// source → 中文标签
-const SOURCE_LABELS: Record<string, string> = {
-    extension: '扩展', skill: '技能', prompt: '模板',
-    model: '模型', tool: '工具', other: '其他',
-};
-// 分组展示顺序
-const SOURCE_ORDER = ['extension', 'skill', 'prompt', 'tool', 'model'];
+// source → 中文标签 / 分组顺序 提到 command-groups.ts 共用
+// （此处仅保留 BUILTIN_COMMANDS）
 
 export class ReloadService {
     // 上一次加载的命令名集合（用于 reload 对比新增/移除）
@@ -107,13 +103,7 @@ export class ReloadService {
         const extInfo = this.getExtensionInfo();
 
         // 按 source 分组（排除 extension，扩展用磁盘扫描结果展示）
-        const groups = new Map<string, { name: string; source: string }[]>();
-        for (const c of cmds) {
-            const src = c.source || 'other';
-            if (src === 'extension') continue;
-            if (!groups.has(src)) groups.set(src, []);
-            groups.get(src)!.push({ name: c.name, source: src });
-        }
+        const groups = groupCommandsBySource<CommandInfo>(cmds, { exclude: ['extension'] });
         const newNames = new Set(cmds.map(c => c.name));
         const removedNames = new Set<string>();
         for (const old of oldNames) {
@@ -135,16 +125,8 @@ export class ReloadService {
             }
 
             // ── 其他分组（prompts、skills 等） ──
-            for (const key of SOURCE_ORDER) {
-                if (key === 'extension') continue;
-                const items = groups.get(key);
-                if (!items || items.length === 0) continue;
-                this.renderReloadGroup(el, SOURCE_LABELS[key] || key, items, oldNames, removedNames);
-                groups.delete(key);
-            }
-            for (const [key, items] of groups.entries()) {
-                if (items.length === 0) continue;
-                this.renderReloadGroup(el, SOURCE_LABELS[key] || key, items, oldNames, removedNames);
+            for (const { key, items } of groups) {
+                this.renderReloadGroup(el, sourceLabel(key), items, oldNames, removedNames);
             }
             if (removedNames.size > 0) {
                 const section = el.createDiv({ cls: 'pi-reload-section pi-reload-section-removed' });
@@ -200,21 +182,10 @@ export class ReloadService {
         cmds: { name: string; source: string }[],
         oldNames: Set<string>,
     ): void {
-        const groups = new Map<string, { name: string; source: string }[]>();
-        for (const c of cmds) {
-            if (!groups.has(c.source)) groups.set(c.source, []);
-            groups.get(c.source)!.push(c);
-        }
+        const groups = groupCommandsBySource<{ name: string; source: string }>(cmds as CommandInfo[], {});
         const emptyRemoved = new Set<string>();
-        for (const key of SOURCE_ORDER) {
-            const items = groups.get(key);
-            if (!items || items.length === 0) continue;
-            this.renderReloadGroup(el, SOURCE_LABELS[key] || key, items, oldNames, emptyRemoved);
-            groups.delete(key);
-        }
-        for (const [key, items] of groups.entries()) {
-            if (items.length === 0) continue;
-            this.renderReloadGroup(el, SOURCE_LABELS[key] || key, items, oldNames, emptyRemoved);
+        for (const { key, items } of groups) {
+            this.renderReloadGroup(el, sourceLabel(key), items, oldNames, emptyRemoved);
         }
         el.createDiv({ cls: 'pi-reload-note', text: '↑ 命令列表未刷新，显示上次加载的内容' });
     }
@@ -223,7 +194,7 @@ export class ReloadService {
     private renderReloadGroup(
         el: HTMLElement,
         label: string,
-        items: { name: string; source: string }[],
+        items: { name: string }[],
         oldNames: Set<string>,
         removedNames: Set<string>,
     ): void {
