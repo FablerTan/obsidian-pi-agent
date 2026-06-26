@@ -5,21 +5,25 @@ import * as path from 'path';
 import { ItemView, WorkspaceLeaf, Notice, setIcon, FileSystemAdapter } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 import { HistoryPanel } from './HistoryPanel';
-import { MarkdownMsg } from './MarkdownMsg';
-import { ToolCallMsg } from './ToolCallMsg';
 import { CommandMenu } from './CommandMenu';
 import { InputStatusBar } from './InputStatusBar';
 import { NoteBar } from './NoteBar';
 import { WelcomePage } from './WelcomePage';
-import { ThinkingBlock } from './ThinkingBlock';
 import { ExtensionUIHandler } from './ExtensionUIHandler';
+import { TurnContext } from './TurnContext';
 import { PiChatSettings } from '../settings';
 import { discoverExtensions, ExtensionInfo } from '../utils/extension-loader';
 import type { PiEvent, GetCommandsData } from '../pi/types';
-import { extractText } from '../pi/types';
 
 // 视图的唯一标识符，用来注册和查找这个视图
 export const PI_CHAT_VIEW_TYPE = 'pi-chat-view';
+
+// 聊天面板阶段状态机
+// - idle：空闲，可发送消息
+// - thinking：AI 正在处理请求（agent_start → agent_end）
+// - reloading：正在重载 pi（/reload 互斥）
+// 注：isCompacting 是独立布尔，可与 thinking 重叠（overflow 压缩在流式中触发）
+type ChatPhase = 'idle' | 'thinking' | 'reloading';
 
 export class PiChatView extends ItemView {
     // 消息列表容器
@@ -31,17 +35,9 @@ export class PiChatView extends ItemView {
     // 加载动画元素（发送消息后、收到回复前显示）
     private loadingEl: HTMLDivElement | null = null;
 
-    // 当前正在流式输出的 markdown 消息（没有时为空）
-    private currentMarkdown: MarkdownMsg | null = null;
-
-    // 当前助手消息的容器 DOM 元素（文字 + 工具卡片都在这个容器里）
-    private currentAssistantEl: HTMLElement | null = null;
-
-    // 当前思考块（AI 推理过程）
-    private thinkingBlock: ThinkingBlock | null = null;
-
-    // 追踪正在执行的工具调用（toolCallId -> ToolCallMsg）
-    private toolCalls: Map<string, ToolCallMsg> = new Map();
+    // 当前回合的渲染上下文（agent_start 创建，agent_end/error/abort 丢弃）
+    // 封装助手气泡、流式 Markdown、思考块、工具卡片，回合结束整体清理
+    private turn: TurnContext | null = null;
 
     // 历史会话管理器
     private historyPanel!: HistoryPanel;
@@ -76,13 +72,10 @@ export class PiChatView extends ItemView {
     // 插件设置（用于扩展目录配置）
     private settings: PiChatSettings;
 
-    // reload 进行中标志，防止重复触发
-    private isReloading = false;
+    // 阶段状态机：合并原 isAgentActive + isReloading
+    private phase: ChatPhase = 'idle';
 
-    // 当前 AI 是否正在处理请求
-    private isAgentActive = false;
-
-    // 是否正在压缩会话上下文
+    // 是否正在压缩会话上下文（独立标志，可与 thinking 重叠）
     private isCompacting = false;
 
     // 压缩状态的系统消息元素（用于更新而不是重复添加）
@@ -116,14 +109,8 @@ export class PiChatView extends ItemView {
         // 订阅进程意外断开：通知用户并重置 UI 状态
         this.disconnectUnsub = this.piClient.onDisconnect((reason) => {
             new Notice(`Pi 进程已退出 (code ${reason.code ?? 'null'})，请检查后重载`);
-            this.clearLoadingTimeout();
-            this.hideLoading();
-            this.isAgentActive = false;
+            this.resetTurnAndPhase();
             this.isCompacting = false;
-            this.currentMarkdown = null;
-            this.currentAssistantEl = null;
-            this.thinkingBlock = null;
-            this.toolCalls.clear();
         });
     }
 
@@ -217,7 +204,7 @@ export class PiChatView extends ItemView {
                 const handled = this.commandMenu.handleKeydown(e);
                 if (handled) return;
             }
-            if (e.key === 'Escape' && this.isAgentActive) {
+            if (e.key === 'Escape' && this.phase === 'thinking') {
                 e.preventDefault();
                 this.abort();
                 return;
@@ -233,7 +220,7 @@ export class PiChatView extends ItemView {
                     ? parts.join('\n\n') + '\n\n' + msg
                     : msg;
 
-                if (this.isAgentActive) {
+                if (this.phase !== 'idle') {
                     new Notice('请等待当前回复完成后再发送');
                     return;
                 }
@@ -300,21 +287,36 @@ export class PiChatView extends ItemView {
     }
 
     // ── 追加助手回复（Markdown 渲染） ──────────
+    // 委托给当前回合上下文；无回合时丢弃（不应发生）
     appendAssistantText(text: string): void {
-        this.hideLoading();
+        this.getOrCreateTurn().appendText(text);
+    }
 
-        if (!this.currentMarkdown) {
-            this.currentAssistantEl = this.getOrCreateAssistantEl();
-            const textEl = this.currentAssistantEl.createDiv({ cls: 'pi-chat-msg-assistant-text' });
-            this.currentMarkdown = new MarkdownMsg(this.app, textEl, this);
+    // ── 获取或创建当前回合上下文 ──────────────
+    // 正常情况下 agent_start 已创建；防御性地处理事件早于 agent_start 的边界
+    private getOrCreateTurn(): TurnContext {
+        if (!this.turn) {
+            this.turn = new TurnContext(this.messagesEl, this.app, this);
         }
+        return this.turn;
+    }
 
-        this.currentMarkdown.append(text);
+    // ── 丢弃当前回合并回到 idle 阶段 ──────────
+    // 统一清理入口：agent_end / error / abort / newSession / disconnect 都调它
+    private resetTurnAndPhase(): void {
+        this.clearLoadingTimeout();
+        this.hideLoading();
+        this.turn = null;
+        this.phase = 'idle';
+    }
+
+    // ── 滚动消息列表到底部（供 TurnContext 调用） ──
+    scrollMessagesToBottom(): void {
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     }
 
     // ── 加载动画 ──────────────────────────────
-    private showLoading(): void {
+    showLoading(): void {
         this.hideLoading();
         this.loadingEl = this.messagesEl.createDiv({ cls: 'pi-chat-loading' });
         for (let i = 0; i < 3; i++) {
@@ -323,7 +325,7 @@ export class PiChatView extends ItemView {
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     }
 
-    private hideLoading(): void {
+    hideLoading(): void {
         if (this.loadingEl) {
             this.loadingEl.remove();
             this.loadingEl = null;
@@ -342,89 +344,56 @@ export class PiChatView extends ItemView {
         switch (event.type) {
             case 'message_update': {
                 const delta = event.assistantMessageEvent;
+                const turn = this.getOrCreateTurn();
                 if (delta.type === 'text_delta') {
-                    this.appendAssistantText(delta.delta);
+                    turn.appendText(delta.delta);
                 }
                 if (delta.type === 'toolcall_start' && this.loadingEl) {
                     this.hideLoading();
                 }
-                // ── 思考链内容 ──
                 if (delta.type === 'thinking_start') {
-                    this.hideLoading();
-                    this.currentMarkdown = null;  // 后续文字另起 textEl
-                    this.currentAssistantEl = this.getOrCreateAssistantEl();
-                    this.thinkingBlock = new ThinkingBlock(this.currentAssistantEl);
+                    turn.startThinking();
                 }
-                if (delta.type === 'thinking_delta' && this.thinkingBlock) {
-                    this.thinkingBlock.append(delta.delta);
-                    this.thinkingBlock.expand();
-                    this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+                if (delta.type === 'thinking_delta') {
+                    turn.appendThinking(delta.delta);
                 }
-                if (delta.type === 'thinking_end' && this.thinkingBlock) {
-                    this.thinkingBlock.finish();
-                    this.thinkingBlock = null;
+                if (delta.type === 'thinking_end') {
+                    turn.endThinking();
                 }
-                // 文本块开始（确保 text 容器已初始化）
                 if (delta.type === 'text_start') {
-                    if (!this.currentMarkdown) {
-                        this.currentAssistantEl = this.getOrCreateAssistantEl();
-                        const textEl = this.currentAssistantEl.createDiv({ cls: 'pi-chat-msg-assistant-text' });
-                        this.currentMarkdown = new MarkdownMsg(this.app, textEl, this);
-                    }
+                    turn.ensureTextContainer();
                 }
                 break;
             }
             case 'tool_execution_start': {
-                this.hideLoading();
-                this.currentMarkdown = null;
-                this.currentAssistantEl = this.getOrCreateAssistantEl();
-                const toolEl = this.currentAssistantEl.createDiv({ cls: 'pi-chat-tool-wrapper' });
-                const card = new ToolCallMsg(toolEl, event.toolName, event.args);
-                this.toolCalls.set(event.toolCallId, card);
-                this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+                this.getOrCreateTurn().addToolCall(event.toolCallId, event.toolName, event.args);
                 break;
             }
             case 'tool_execution_update': {
-                const card = this.toolCalls.get(event.toolCallId);
-                if (card) {
-                    const text = extractText(event.partialResult?.content);
-                    if (text) card.setOutput(text);
-                    this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
-                }
+                this.getOrCreateTurn().updateToolCall(event.toolCallId, event.partialResult?.content);
                 break;
             }
             case 'tool_execution_end': {
-                const card = this.toolCalls.get(event.toolCallId);
-                if (card) {
-                    card.setResult(event.result, event.isError);
-                    this.toolCalls.delete(event.toolCallId);
-                    this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
-                }
+                this.getOrCreateTurn().endToolCall(event.toolCallId, event.result, event.isError);
                 break;
             }
             case 'agent_start': {
-                this.isAgentActive = true;
+                this.phase = 'thinking';
+                // 新建本回合上下文（丢弃可能残留的旧回合）
+                this.turn = new TurnContext(this.messagesEl, this.app, this);
                 if (!this.loadingEl) {
                     this.showLoading();
                 }
                 break;
             }
             case 'agent_end': {
-                this.isAgentActive = false;
-                this.currentMarkdown = null;
-                this.currentAssistantEl = null;
-                this.thinkingBlock = null;
-                this.toolCalls.clear();
+                this.resetTurnAndPhase();
                 // 更新底部 Token 用量
                 this.inputStatusBar.updateContextUsage();
                 break;
             }
             case 'extension_error': {
-                this.hideLoading();
-                this.currentMarkdown = null;
-                this.currentAssistantEl = null;
-                this.thinkingBlock = null;
-                this.toolCalls.clear();
+                this.resetTurnAndPhase();
                 const detail = event.error
                     ? `扩展错误 (${event.event ?? ''}): ${event.error}`
                     : 'Pi 扩展发生错误';
@@ -432,11 +401,7 @@ export class PiChatView extends ItemView {
                 break;
             }
             case 'error': {
-                this.hideLoading();
-                this.currentMarkdown = null;
-                this.currentAssistantEl = null;
-                this.thinkingBlock = null;
-                this.toolCalls.clear();
+                this.resetTurnAndPhase();
                 const msg = event.message ?? 'Pi 返回了错误';
                 new Notice(typeof msg === 'string' ? msg : 'Pi 返回了错误');
                 break;
@@ -522,21 +487,6 @@ export class PiChatView extends ItemView {
         }
     }
 
-    // ── 获取或创建助手消息气泡 ────────────────
-    private getOrCreateAssistantEl(): HTMLElement {
-        if (this.currentAssistantEl && this.messagesEl.contains(this.currentAssistantEl)) {
-            return this.currentAssistantEl;
-        }
-        const last = this.messagesEl.querySelector('.pi-chat-msg-assistant:last-child') as HTMLElement | null;
-        if (last) {
-            this.currentAssistantEl = last;
-            return last;
-        }
-        const el = this.messagesEl.createDiv({ cls: 'pi-chat-msg-assistant' });
-        this.currentAssistantEl = el;
-        return el;
-    }
-
     // ── 从 Pi 加载可用命令列表 ────────────────
     private async loadCommands(): Promise<void> {
         try {
@@ -562,18 +512,13 @@ export class PiChatView extends ItemView {
 
     // ── 处理 /new ──────────────────────────────
     private async handleNewSession(): Promise<void> {
-        this.clearLoadingTimeout();
-        this.hideLoading();
         this.commandMenu.hide();
         this.textarea.value = '';
         try {
             const resp = await this.piClient.sendAndWait<{ cancelled: boolean }>({ type: 'new_session' });
             if (resp?.success) {
+                this.resetTurnAndPhase();
                 this.messagesEl.empty();
-                this.currentMarkdown = null;
-                this.currentAssistantEl = null;
-                this.thinkingBlock = null;
-                this.toolCalls.clear();
                 this.welcomePage = new WelcomePage(this.messagesEl, this.app, this.piClient);
                 this.welcomePage.loadData(this.buildExtensionInfo());
                 new Notice('已创建新会话');
@@ -587,15 +532,9 @@ export class PiChatView extends ItemView {
 
     // ── 打断 AI 输出 ──────────────────────────
     private abort(): void {
-        this.clearLoadingTimeout();
         this.commandMenu.hide();
         this.piClient.send({ type: 'abort' });
-        this.hideLoading();
-        this.isAgentActive = false;
-        this.currentMarkdown = null;
-        this.currentAssistantEl = null;
-        this.thinkingBlock = null;
-        this.toolCalls.clear();
+        this.resetTurnAndPhase();
         // 打断后如果有排队的消息，保持其排队样式，等待后续处理
         new Notice('已打断');
     }
@@ -677,11 +616,11 @@ export class PiChatView extends ItemView {
     // ── 处理 /reload ──────────────────────────
     private async handleReload(): Promise<void> {
         // ── 互斥锁：reload 进行中时禁止重复触发 ──
-        if (this.isReloading) {
+        if (this.phase === 'reloading') {
             new Notice('Pi 正在重载中，请稍候…');
             return;
         }
-        this.isReloading = true;
+        this.phase = 'reloading';
         this.commandMenu.hide();
         this.textarea.value = '';
         try {
@@ -695,11 +634,11 @@ export class PiChatView extends ItemView {
             await this.piClient.restart();
 
             // 持续轮询直到 get_commands 成功（最长等 10 秒，每 800ms 一次）
-            // 期间 isReloading = true，用户无法重复触发
+            // 期间 phase = 'reloading'，用户无法重复触发
             let cmds: any[] | null = null;
             for (let attempt = 0; attempt < 12; attempt++) {
                 if (attempt > 0) {
-                    await new Promise(r => setTimeout(r, 800));
+                    await new Promise(r => window.setTimeout(r, 800));
                 }
                 const resp = await this.piClient.sendAndWait<GetCommandsData>({ type: 'get_commands' });
                 if (resp?.success && resp.data?.commands) {
@@ -715,7 +654,7 @@ export class PiChatView extends ItemView {
         } catch {
             new Notice('重载失败');
         } finally {
-            this.isReloading = false;
+            this.phase = 'idle';
         }
     }
 
@@ -891,12 +830,6 @@ export class PiChatView extends ItemView {
                 itemEl.addClass('pi-reload-item-removed');
             }
         }
-    }
-
-    // ── 从 content 数组中提取纯文本 ────────────
-    // 保留为私有方法供历史代码调用；新代码直接用 pi/types 的 extractText
-    private extractTextFromContent(content: unknown): string {
-        return extractText(content as any);
     }
 
     // ── 构建扩展扫描目录列表 ──
