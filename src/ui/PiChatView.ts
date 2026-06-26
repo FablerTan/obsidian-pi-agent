@@ -94,16 +94,35 @@ export class PiChatView extends ItemView {
     // RPC 客户端
     private piClient: PiRpcClient;
 
+    // 事件订阅取消函数（onClose 时调用）
+    private eventUnsub: (() => void) | null = null;
+
+    // 断开订阅取消函数
+    private disconnectUnsub: (() => void) | null = null;
+
     constructor(leaf: WorkspaceLeaf, piClient: PiRpcClient, settings: PiChatSettings) {
         super(leaf);
         this.piClient = piClient;
         this.settings = settings;
         this.vaultPath = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
 
-        // 注册事件回调：pi 返回的事件都到这里
-        this.piClient.onEvent = (event) => {
+        // 订阅 pi 事件：pi 返回的事件都到这里（支持多视图同时订阅）
+        this.eventUnsub = this.piClient.on((event) => {
             this.handlePiEvent(event);
-        };
+        });
+
+        // 订阅进程意外断开：通知用户并重置 UI 状态
+        this.disconnectUnsub = this.piClient.onDisconnect((reason) => {
+            new Notice(`Pi 进程已退出 (code ${reason.code ?? 'null'})，请检查后重载`);
+            this.clearLoadingTimeout();
+            this.hideLoading();
+            this.isAgentActive = false;
+            this.isCompacting = false;
+            this.currentMarkdown = null;
+            this.currentAssistantEl = null;
+            this.thinkingBlock = null;
+            this.toolCalls.clear();
+        });
     }
 
     getViewType(): string { return PI_CHAT_VIEW_TYPE; }
@@ -256,7 +275,13 @@ export class PiChatView extends ItemView {
     }
 
     async onClose(): Promise<void> {
-        this.piClient.onEvent = null;
+        // 取消事件订阅，避免视图销毁后仍被回调
+        this.eventUnsub?.();
+        this.eventUnsub = null;
+        this.disconnectUnsub?.();
+        this.disconnectUnsub = null;
+        // 清理超时定时器，防止视图销毁后操作已销毁的 DOM
+        this.clearLoadingTimeout();
         this.noteBar?.destroy();
         this.extUiHandler?.destroy();
     }

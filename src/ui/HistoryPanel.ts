@@ -139,19 +139,31 @@ export class HistoryPanel {
     private async switchToSession(sessionPath: string): Promise<void> {
         new Notice('正在切换会话...');
 
-        const switchResp = await this.piClient.sendAndWait({
-            type: 'switch_session',
-            sessionPath,
-        });
+        let switchResp: any;
+        try {
+            switchResp = await this.piClient.sendAndWait({
+                type: 'switch_session',
+                sessionPath,
+            });
+        } catch (e) {
+            new Notice('切换会话失败: ' + (e as Error).message);
+            return;
+        }
 
         if (!switchResp?.success) {
             new Notice('切换会话失败');
             return;
         }
 
-        const msgResp = await this.piClient.sendAndWait({
-            type: 'get_messages',
-        });
+        let msgResp: any;
+        try {
+            msgResp = await this.piClient.sendAndWait({
+                type: 'get_messages',
+            });
+        } catch (e) {
+            new Notice('获取消息失败: ' + (e as Error).message);
+            return;
+        }
 
         if (!msgResp?.success) {
             new Notice('获取消息失败');

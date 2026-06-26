@@ -32,6 +32,10 @@ export default class PiChatPlugin extends Plugin {
 		this.piClient.start(vaultPath).catch((err) => {
 			new Notice('Pi 启动失败: ' + err.message);
 		});
+		// 全局监听 pi 意外退出（主动 stop/unload 不会触发）
+		this.piClient.onDisconnect((reason) => {
+			console.warn('pi disconnected:', reason);
+		});
 
 		// 注册聊天面板视图
 		this.registerView(
