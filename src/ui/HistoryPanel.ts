@@ -1,13 +1,11 @@
 // 历史会话底部浮层：读取、显示、切换历史会话
-import { Notice, setIcon, FileSystemAdapter, App } from 'obsidian';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { Notice, setIcon, App } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
-import { extractText } from '../pi/types';
 import type { SwitchSessionData, GetMessagesData } from '../pi/types';
 import { AssistantMessageView } from './AssistantMessageView';
 import { enhanceCodeBlocks } from './code-blocks';
+import { extractText } from '../pi/types';
+import { readSessions } from '../utils/session-file-reader';
 
 export class HistoryPanel {
     constructor(
@@ -27,7 +25,7 @@ export class HistoryPanel {
             return;
         }
 
-        const sessions = this.readSessions();
+        const sessions = await readSessions(this.app);
 
         // 半透明背景（点击关闭）
         const backdrop = this.contentEl.createDiv({ cls: 'pi-history-backdrop' });
@@ -75,67 +73,7 @@ export class HistoryPanel {
     }
 
     // ── 读取会话列表 ──────────────────────────
-    private readSessions(): Array<{ file: string; displayName: string }> {
-        const sessionsDir = path.join(os.homedir(), '.pi', 'agent', 'sessions');
-        const vaultPath = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
-        const encodedPath = vaultPath.replace(/^\//, '').replace(/\//g, '-');
-        const fullDir = path.join(sessionsDir, '--' + encodedPath + '--');
 
-        let files: string[] = [];
-        try {
-            files = fs.readdirSync(fullDir).filter(f => f.endsWith('.jsonl'));
-        } catch {
-            return [];
-        }
-
-        files.sort().reverse();
-
-        const sessions: Array<{ file: string; displayName: string }> = [];
-        for (const f of files) {
-            const filePath = path.join(fullDir, f);
-            let displayName: string;
-
-            try {
-                const content = fs.readFileSync(filePath, 'utf-8');
-                const lines = content.split('\n');
-                const header = JSON.parse(lines[0] || '{}');
-
-                if (header.name) {
-                    displayName = header.name;
-                } else {
-                    // 没有名称则取第一条用户消息
-                    let firstMsg = '';
-                    for (let i = 1; i < lines.length; i++) {
-                        try {
-                            const line = lines[i];
-                            if (!line) continue;
-                            const entry = JSON.parse(line);
-                            if (entry.type === 'message' && entry.message?.role === 'user') {
-                                const rawContent = entry.message.content;
-                                const text = rawContent ? extractText(rawContent as any) : '';
-                                if (text) {
-                                    firstMsg = text.length > 40 ? text.slice(0, 40) + '...' : text;
-                                    break;
-                                }
-                            }
-                        } catch {}
-                    }
-
-                    if (firstMsg) {
-                        displayName = firstMsg;
-                    } else {
-                        const dateStr = f.split('_')[0] || f;
-                        displayName = dateStr.replace(/T/, ' ').replace(/-\d+Z$/, '');
-                    }
-                }
-            } catch {
-                displayName = f;
-            }
-
-            sessions.push({ file: filePath, displayName });
-        }
-        return sessions;
-    }
 
     // ── 切换到指定会话 ──────────────────────────
     private async switchToSession(sessionPath: string): Promise<void> {
