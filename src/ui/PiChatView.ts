@@ -517,6 +517,7 @@ export class PiChatView extends ItemView {
                 this.messagesEl.empty();
                 this.welcomePage = new WelcomePage(this.messagesEl, this.app, this.piClient);
                 this.welcomePage.loadData(await this.reloadService.getExtensionInfo());
+                this.inputStatusBar.updateContextUsage();
                 new Notice('已创建新会话');
             } else {
                 new Notice('新建会话失败');
