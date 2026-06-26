@@ -7,8 +7,6 @@ import { readCompactionSettings, writeCompactionSettings, readResourcePaths, wri
 export interface PiChatSettings {
 	piPath: string;
 	autoCompaction: boolean;
-	compactionMode: 'token' | 'percent';
-	compactionPercent: number;
 	skillPaths: string;
 	promptPaths: string;
 	extensionPaths: string;
@@ -17,8 +15,6 @@ export interface PiChatSettings {
 export const DEFAULT_SETTINGS: PiChatSettings = {
 	piPath: '/opt/homebrew/bin/pi',
 	autoCompaction: true,
-	compactionMode: 'token',
-	compactionPercent: 80,
 	skillPaths: '',
 	promptPaths: '',
 	extensionPaths: '',
@@ -35,8 +31,13 @@ export class PiChatSettingTab extends PluginSettingTab {
 	// 项目根目录（空表示尚未初始化）
 	private projectPath = '';
 
-	// 压缩阈值（每次 display 时重新读取）
+	// 压缩阈值（每次 display 时从 .pi/settings.json 读取，单一真相源）
 	private compactionThresholds: PiCompactionSettings = { reserveTokens: 16384, keepRecentTokens: 20000 };
+
+	// ── UI 本地状态（不持久化，不在 PiChatSettings 中） ──
+	// 这些仅用于设置面板 UI 交互，实际生效字段写入 .pi/settings.json
+	private compactionMode: 'token' | 'percent' = 'token';
+	private compactionPercent = 80;
 
 	display(): void {
 		const { containerEl } = this;
@@ -179,16 +180,15 @@ export class PiChatSettingTab extends PluginSettingTab {
 					dropdown
 						.addOption('token', 'Token 数')
 						.addOption('percent', '百分比')
-						.setValue(this.plugin.settings.compactionMode)
+						.setValue(this.compactionMode)
 						.onChange(async (value) => {
-							this.plugin.settings.compactionMode = value as 'token' | 'percent';
-							await this.plugin.saveSettings();
+							this.compactionMode = value as 'token' | 'percent';
 							this.saveCompactionThresholds();
 							this.display();
 						}),
 				);
 
-			if (this.plugin.settings.compactionMode === 'token') {
+			if (this.compactionMode === 'token') {
 				// Token 模式
 				new Setting(containerEl)
 					.setName('预留 Token (reserveTokens)')
@@ -212,11 +212,10 @@ export class PiChatSettingTab extends PluginSettingTab {
 					.addSlider((slider) =>
 						slider
 							.setLimits(10, 95, 5)
-							.setValue(this.plugin.settings.compactionPercent)
+							.setValue(this.compactionPercent)
 							.setDynamicTooltip()
 							.onChange(async (value) => {
-								this.plugin.settings.compactionPercent = value;
-								await this.plugin.saveSettings();
+								this.compactionPercent = value;
 								this.saveCompactionThresholds();
 							}),
 					);
@@ -255,10 +254,9 @@ export class PiChatSettingTab extends PluginSettingTab {
 
 	// ── 按当前模式计算并写入项目 .pi/settings.json ──
 	private saveCompactionThresholds(): void {
-		const s = this.plugin.settings;
-		if (s.compactionMode === 'percent') {
+		if (this.compactionMode === 'percent') {
 			const defaultWindow = 200000;
-			const pct = s.compactionPercent / 100;
+			const pct = this.compactionPercent / 100;
 			this.compactionThresholds.reserveTokens = Math.round(defaultWindow * (1 - pct));
 		}
 		void writeCompactionSettings(this.compactionThresholds, this.projectPath);
