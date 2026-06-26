@@ -35,6 +35,9 @@ export class InputStatusBar {
         thinkingLevel: '',
     };
 
+    // 存储 activeDocument 点击处理器引用，供 destroy 移除
+    private activeDocClickHandler: ((e: MouseEvent) => void) | null = null;
+
     constructor(
         private container: HTMLElement,      // .pi-chat-container
         private piClient: PiRpcClient,
@@ -70,12 +73,13 @@ export class InputStatusBar {
         // 加载初始状态
         this.loadState();
 
-        // 点击下拉外部关闭
-        activeDocument.addEventListener('click', (e) => {
+        // 点击下拉外部关闭（存储引用供 destroy 移除）
+        this.activeDocClickHandler = (e: MouseEvent) => {
             if (this.dropdownEl && !this.dropdownEl.contains(e.target as Node)) {
                 this.closeDropdown();
             }
-        });
+        };
+        activeDocument.addEventListener('click', this.activeDocClickHandler);
     }
 
     // ── 加载当前状态 ──────────────────────────
@@ -237,5 +241,14 @@ export class InputStatusBar {
         } catch {
             new Notice('切换思考层级失败');
         }
+    }
+
+    // ── 清理（视图关闭时调用） ─────────────────
+    destroy(): void {
+        if (this.activeDocClickHandler) {
+            activeDocument.removeEventListener('click', this.activeDocClickHandler);
+            this.activeDocClickHandler = null;
+        }
+        this.closeDropdown();
     }
 }

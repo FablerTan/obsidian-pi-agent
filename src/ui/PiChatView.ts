@@ -188,7 +188,7 @@ export class PiChatView extends ItemView {
         // 输入变化时检测 / 命令
         // 中文输入法（IME）组合期间，拼音音节间的空格是输入法缓冲区的一部分，
         // 不是命令和参数的分隔符，因此组合期间忽略空格，取空格前的文字作为检索词
-        textarea.addEventListener('input', (e: Event) => {
+        this.registerDomEvent(textarea, 'input', (e: Event) => {
             const val = textarea.value;
             const ie = e as InputEvent;
             if (val.startsWith('/') && (!val.includes(' ') || ie.isComposing)) {
@@ -204,7 +204,7 @@ export class PiChatView extends ItemView {
         });
 
         // Enter 发送，Shift+Enter 换行，Esc 打断
-        textarea.addEventListener('keydown', (e) => {
+        this.registerDomEvent(textarea, 'keydown', (e) => {
             if (this.commandMenu.isVisible() && !e.isComposing) {
                 const handled = this.commandMenu.handleKeydown(e);
                 if (handled) return;
@@ -286,6 +286,7 @@ export class PiChatView extends ItemView {
         this.clearLoadingTimeout();
         this.noteBar?.destroy();
         this.extUiHandler?.destroy();
+        this.inputStatusBar?.destroy();
     }
 
     // ── 移除欢迎页（插入系统消息前调用） ─────
