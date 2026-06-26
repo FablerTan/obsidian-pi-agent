@@ -1,7 +1,11 @@
 // 聊天面板核心视图
-// 负责：面板生命周期、消息流（用户输入 + AI 回复）、加载动画、命令菜单、历史面板
-import * as os from 'os';
-import * as path from 'path';
+// 负责：面板生命周期、消息流（用户输入 + AI 回复）、加载动画、事件分发
+// 业务逻辑拆分到协作服务：
+//   ReloadService（/reload + 命令加载 + 扩展发现）
+//   StatsService（/stats）
+//   SystemMessageRenderer（系统消息）
+//   CommandRouter（命令菜单分派）
+//   TurnContext（回合渲染状态）
 import { ItemView, WorkspaceLeaf, Notice, setIcon, FileSystemAdapter } from 'obsidian';
 import { PiRpcClient } from '../pi/rpc-client';
 import { HistoryPanel } from './HistoryPanel';
@@ -11,9 +15,12 @@ import { NoteBar } from './NoteBar';
 import { WelcomePage } from './WelcomePage';
 import { ExtensionUIHandler } from './ExtensionUIHandler';
 import { TurnContext } from './TurnContext';
+import { SystemMessageRenderer } from './SystemMessageRenderer';
+import { ReloadService } from './ReloadService';
+import { StatsService } from './StatsService';
+import { CommandRouter } from './CommandRouter';
 import { PiChatSettings } from '../settings';
-import { discoverExtensions, ExtensionInfo } from '../utils/extension-loader';
-import type { PiEvent, GetCommandsData } from '../pi/types';
+import type { PiEvent } from '../pi/types';
 
 // 视图的唯一标识符，用来注册和查找这个视图
 export const PI_CHAT_VIEW_TYPE = 'pi-chat-view';
@@ -35,6 +42,9 @@ export class PiChatView extends ItemView {
     // 加载动画元素（发送消息后、收到回复前显示）
     private loadingEl: HTMLDivElement | null = null;
 
+    // 5 秒超时保护定时器
+    private loadingTimeout: number | null = null;
+
     // 当前回合的渲染上下文（agent_start 创建，agent_end/error/abort 丢弃）
     // 封装助手气泡、流式 Markdown、思考块、工具卡片，回合结束整体清理
     private turn: TurnContext | null = null;
@@ -45,6 +55,9 @@ export class PiChatView extends ItemView {
     // 命令菜单（输入 / 时弹出）
     private commandMenu!: CommandMenu;
 
+    // 命令路由器（分派内置命令到各处理器）
+    private commandRouter!: CommandRouter;
+
     // 底部状态栏（模型 + 思考层级）
     private inputStatusBar!: InputStatusBar;
 
@@ -53,18 +66,6 @@ export class PiChatView extends ItemView {
 
     // 输入框
     private textarea!: HTMLTextAreaElement;
-
-    // 5 秒超时保护定时器
-    private loadingTimeout: number | null = null;
-
-    // 上一次加载的命令名集合（用于 /reload 对比新增/移除）
-    private previousCmdNames: Set<string> = new Set();
-
-    // 上一次加载的完整命令数据（含 source），用于 /reload 失败时回退显示
-    private previousCmdList: { name: string; source: string }[] = [];
-
-    // 上一次 get_commands 返回的原始命令数组（含 path 字段），用于扩展发现
-    private lastRawCommands: any[] = [];
 
     // vault 根目录（绝对路径）
     private vaultPath: string;
@@ -80,6 +81,15 @@ export class PiChatView extends ItemView {
 
     // 压缩状态的系统消息元素（用于更新而不是重复添加）
     private compactionMsgEl: HTMLElement | null = null;
+
+    // 系统消息渲染器
+    private systemMsg!: SystemMessageRenderer;
+
+    // /reload 服务（含命令加载 + 扩展发现）
+    private reloadService!: ReloadService;
+
+    // /stats 服务
+    private statsService!: StatsService;
 
 
 
@@ -164,20 +174,15 @@ export class PiChatView extends ItemView {
 
         // ── 命令菜单（输入 / 时弹出） ──
         this.commandMenu = new CommandMenu(menuContainer, textarea, (cmd) => {
-            if (cmd.name === 'new') {
-                this.handleNewSession();
-            } else if (cmd.name === 'reload') {
-                this.handleReload();
-            } else if (cmd.name === 'history') {
-                this.handleHistory();
-            } else if (cmd.name === 'compact') {
-                this.handleCompact();
-            } else if (cmd.name === 'stats') {
-                this.handleStats();
-            } else {
-                textarea.value = '/' + cmd.name + ' ';
-                textarea.focus();
-            }
+            this.commandRouter.handle(cmd);
+        });
+        // 命令路由器：分派内置命令到各处理器
+        this.commandRouter = new CommandRouter(this.commandMenu, textarea, {
+            newSession: () => this.handleNewSession(),
+            reload: () => this.handleReload(),
+            history: () => this.handleHistory(),
+            compact: () => this.handleCompact(),
+            stats: () => this.handleStats(),
         });
 
         // 输入变化时检测 / 命令
@@ -255,12 +260,20 @@ export class PiChatView extends ItemView {
 
         this.messagesEl = messagesEl;
 
+        // 系统消息渲染器（压缩状态/统计/reload 结果共用）
+        this.systemMsg = new SystemMessageRenderer(messagesEl, () => this.removeWelcomePage());
+        // /reload 服务（含命令加载 + 扩展发现）
+        this.reloadService = new ReloadService(
+            this.piClient, this.commandMenu, this.systemMsg, this.vaultPath, this.settings,
+        );
+        // /stats 服务
+        this.statsService = new StatsService(this.piClient, this.systemMsg);
+
         // 预加载命令列表（作为 reload 对比基准）
-        await this.loadCommands();
+        await this.reloadService.loadCommands();
 
         // pi 就绪后再加载欢迎页数据（含扩展发现）
-        const extInfo = this.buildExtensionInfo();
-        this.welcomePage.loadData(extInfo);
+        this.welcomePage.loadData(this.reloadService.getExtensionInfo());
     }
 
     async onClose(): Promise<void> {
@@ -275,12 +288,17 @@ export class PiChatView extends ItemView {
         this.extUiHandler?.destroy();
     }
 
-    // ── 添加用户消息 ──────────────────────────
-    addUserMessage(text: string): void {
+    // ── 移除欢迎页（插入系统消息前调用） ─────
+    private removeWelcomePage(): void {
         if (this.welcomePage) {
             this.welcomePage.remove();
             this.welcomePage = null as any;
         }
+    }
+
+    // ── 添加用户消息 ──────────────────────────
+    addUserMessage(text: string): void {
+        this.removeWelcomePage();
         const msgEl = this.messagesEl.createDiv({ cls: 'pi-chat-msg-user' });
         msgEl.setText(text);
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
@@ -412,7 +430,7 @@ export class PiChatView extends ItemView {
                     manual: '手动', threshold: '阈值', overflow: '溢出',
                 };
                 const reasonText = reasonMap[event.reason] || event.reason || '';
-                this.addSystemMessage('compress', '正在压缩会话…', (el) => {
+                this.systemMsg.add('compress', '正在压缩会话…', (el) => {
                     // el 是 body 子元素，存父元素以便后续更新 header
                     this.compactionMsgEl = el.parentElement ?? el;
                     el.createDiv({ text: '正在压缩上下文，请稍候…' });
@@ -455,16 +473,16 @@ export class PiChatView extends ItemView {
                 } else {
                     // 消息不在 DOM 中了，重新添加一条
                     if (event.aborted) {
-                        this.addSystemMessage('x-circle', '压缩已取消', (el) => {
+                        this.systemMsg.add('x-circle', '压缩已取消', (el) => {
                             el.setText('会话压缩被中止');
                         });
                     } else if (event.errorMessage) {
-                        this.addSystemMessage('alert-circle', '压缩失败', (el) => {
+                        this.systemMsg.add('alert-circle', '压缩失败', (el) => {
                             el.setText(`压缩失败: ${event.errorMessage}`);
                         });
                     } else if (event.result) {
                         const saved = event.result.tokensBefore ?? 0;
-                        this.addSystemMessage('check-circle', '压缩完成', (el) => {
+                        this.systemMsg.add('check-circle', '压缩完成', (el) => {
                             el.setText(`已释放 ${saved.toLocaleString()} token 空间`);
                         });
                     }
@@ -487,29 +505,6 @@ export class PiChatView extends ItemView {
         }
     }
 
-    // ── 从 Pi 加载可用命令列表 ────────────────
-    private async loadCommands(): Promise<void> {
-        try {
-            const resp = await this.piClient.sendAndWait<GetCommandsData>({ type: 'get_commands' });
-            if (resp?.success && resp.data?.commands) {
-                const builtins = [
-                    { name: 'new', description: '新建会话', source: 'extension' as const },
-                    { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
-                    { name: 'history', description: '历史会话', source: 'extension' as const },
-                    { name: 'compact', description: '压缩会话上下文', source: 'extension' as const },
-                    { name: 'stats', description: '查看 Token 用量统计', source: 'extension' as const },
-                ];
-                const cmds: any[] = resp.data.commands;
-                const allCmds = [...builtins, ...cmds];
-                this.commandMenu.setCommands(allCmds);
-                // 保存命令名（不含 builtins）用于 reload 对比
-                this.previousCmdNames = new Set(cmds.map((c: any) => c.name));
-                this.previousCmdList = cmds.map((c: any) => ({ name: c.name, source: c.source || 'other' }));
-                this.lastRawCommands = cmds;
-            }
-        } catch { /* pi 还未就绪，忽略 */ }
-    }
-
     // ── 处理 /new ──────────────────────────────
     private async handleNewSession(): Promise<void> {
         this.commandMenu.hide();
@@ -520,7 +515,7 @@ export class PiChatView extends ItemView {
                 this.resetTurnAndPhase();
                 this.messagesEl.empty();
                 this.welcomePage = new WelcomePage(this.messagesEl, this.app, this.piClient);
-                this.welcomePage.loadData(this.buildExtensionInfo());
+                this.welcomePage.loadData(this.reloadService.getExtensionInfo());
                 new Notice('已创建新会话');
             } else {
                 new Notice('新建会话失败');
@@ -558,64 +553,12 @@ export class PiChatView extends ItemView {
     private async handleStats(): Promise<void> {
         this.commandMenu.hide();
         this.textarea.value = '';
-        try {
-            const resp = await this.piClient.getSessionStats();
-            if (!resp?.success || !resp?.data) {
-                new Notice('获取统计失败');
-                return;
-            }
-            const d = resp.data;
-            const tokens = d.tokens || {};
-            const cost = d.cost;
-            const ctx = d.contextUsage;
-
-            const lines: string[] = [];
-            lines.push(`消息: ${d.totalMessages} 条（用户 ${d.userMessages} / 助手 ${d.assistantMessages}）`);
-            if (d.toolCalls) lines.push(`工具调用: ${d.toolCalls} 次`);
-            lines.push('');
-            lines.push(`输入 Token: ${(tokens.input ?? 0).toLocaleString()}`);
-            lines.push(`输出 Token: ${(tokens.output ?? 0).toLocaleString()}`);
-            if (tokens.cacheRead) lines.push(`缓存读取: ${tokens.cacheRead.toLocaleString()}`);
-            if (tokens.cacheWrite) lines.push(`缓存写入: ${tokens.cacheWrite.toLocaleString()}`);
-            lines.push(`总计 Token: ${(tokens.total ?? 0).toLocaleString()}`);
-            if (cost != null) lines.push(`费用: $${cost.toFixed(4)}`);
-            if (ctx) {
-                const pct = ctx.percent != null ? `${ctx.percent}%` : '—';
-                lines.push('');
-                lines.push(`上下文: ${(ctx.tokens ?? 0).toLocaleString()} / ${ctx.contextWindow.toLocaleString()} (${pct})`);
-            }
-
-            this.addSystemMessage('bar-chart', '会话统计', (el) => {
-                el.setText(lines.join('\n'));
-            });
-        } catch {
-            new Notice('获取统计失败');
-        }
-    }
-
-
-
-    // ── 添加系统通知消息 ──────────────────────
-    private addSystemMessage(icon: string, title: string, bodyFn: (el: HTMLElement) => void): void {
-        if (this.welcomePage) {
-            this.welcomePage.remove();
-            this.welcomePage = null as any;
-        }
-        const msgEl = this.messagesEl.createDiv({ cls: 'pi-msg-system' });
-        // 头部（和思考块头部样式一致）
-        const header = msgEl.createDiv({ cls: 'pi-msg-system-header' });
-        const iconEl = header.createSpan({ cls: 'pi-msg-system-icon' });
-        setIcon(iconEl, icon);
-        header.createSpan({ cls: 'pi-msg-system-title', text: title });
-        // 主体（和思考块主体样式一致）
-        const body = msgEl.createDiv({ cls: 'pi-msg-system-body' });
-        bodyFn(body);
-        this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+        await this.statsService.run();
     }
 
     // ── 处理 /reload ──────────────────────────
     private async handleReload(): Promise<void> {
-        // ── 互斥锁：reload 进行中时禁止重复触发 ──
+        // 互斥锁：reload 进行中时禁止重复触发
         if (this.phase === 'reloading') {
             new Notice('Pi 正在重载中，请稍候…');
             return;
@@ -624,233 +567,11 @@ export class PiChatView extends ItemView {
         this.commandMenu.hide();
         this.textarea.value = '';
         try {
-            // ── 在进入 async 流程前就锁定对比基准（局部常量，不受后续副作用影响） ──
-            const oldNames = this.previousCmdNames.size > 0
-                ? new Set(this.previousCmdNames)
-                : await this.fetchCurrentCmdNames();
-            const oldCmdList = this.previousCmdList;
-
-            new Notice('正在重载 Pi…');
-            await this.piClient.restart();
-
-            // 持续轮询直到 get_commands 成功（最长等 10 秒，每 800ms 一次）
-            // 期间 phase = 'reloading'，用户无法重复触发
-            let cmds: any[] | null = null;
-            for (let attempt = 0; attempt < 12; attempt++) {
-                if (attempt > 0) {
-                    await new Promise(r => window.setTimeout(r, 800));
-                }
-                const resp = await this.piClient.sendAndWait<GetCommandsData>({ type: 'get_commands' });
-                if (resp?.success && resp.data?.commands) {
-                    cmds = resp.data.commands;
-                    break;
-                }
-            }
-            if (cmds) {
-                this.handleReloadSuccess(cmds, oldNames, oldCmdList);
-            } else {
-                new Notice('Pi 重载超时，请重试');
-            }
+            await this.reloadService.run();
         } catch {
             new Notice('重载失败');
         } finally {
             this.phase = 'idle';
         }
-    }
-
-    // ── /reload 成功：渲染命令列表 + 对比新增/移除 ──
-    private handleReloadSuccess(
-        cmds: any[],
-        oldNames: Set<string>,
-        oldCmdList: { name: string; source: string }[],
-    ): void {
-        this.commandMenu.setCommands([
-            { name: 'new', description: '新建会话', source: 'extension' as const },
-            { name: 'reload', description: '重新加载扩展', source: 'extension' as const },
-            { name: 'history', description: '历史会话', source: 'extension' as const },
-            { name: 'compact', description: '压缩会话上下文', source: 'extension' as const },
-            { name: 'stats', description: '查看 Token 用量统计', source: 'extension' as const },
-            ...cmds,
-        ]);
-
-        // 扩展发现（磁盘扫描 + commands 交叉引用）
-        const extInfo = this.buildExtensionInfo();
-
-        // 按 source 分组（排除 extension，扩展用磁盘扫描结果展示）
-        const groups = new Map<string, { name: string; source: string }[]>();
-        for (const c of cmds) {
-            const src = c.source || 'other';
-            if (src === 'extension') continue;
-            if (!groups.has(src)) groups.set(src, []);
-            groups.get(src)!.push({ name: c.name, source: src });
-        }
-        const newNames = new Set(cmds.map((c: any) => c.name));
-        const removedNames = new Set<string>();
-        for (const old of oldNames) {
-            if (!newNames.has(old)) {
-                removedNames.add(old);
-            }
-        }
-        const labels: Record<string, string> = {
-            extension: '扩展', skill: '技能', prompt: '模板',
-            model: '模型', tool: '工具', other: '其他',
-        };
-        const order = ['extension', 'skill', 'prompt', 'tool', 'model'];
-        this.addSystemMessage('refresh-cw', 'Pi 已重载', (el) => {
-            // ── 扩展：用磁盘扫描结果展示（含无命令的扩展） ──
-            if (extInfo.length > 0) {
-                const extSection = el.createDiv({ cls: 'pi-reload-section' });
-                extSection.createSpan({ cls: 'pi-reload-label', text: '扩展' });
-                extSection.createSpan({ cls: 'pi-reload-count', text: String(extInfo.length) });
-                const itemsWrap = el.createDiv({ cls: 'pi-reload-items' });
-                for (const e of extInfo) {
-                    const itemEl = itemsWrap.createSpan({ cls: 'pi-reload-item' });
-                    itemEl.setText(e.name);
-                    if (!e.confirmed) {
-                        itemEl.addClass('pi-reload-item-unconfirmed');
-                    }
-                }
-            }
-
-            // ── 其他分组（prompts、skills 等） ──
-            for (const key of order) {
-                if (key === 'extension') continue;
-                const items = groups.get(key);
-                if (!items || items.length === 0) continue;
-                this.renderReloadGroup(el, labels[key] || key, items, oldNames, removedNames);
-                groups.delete(key);
-            }
-            for (const [key, items] of groups.entries()) {
-                if (items.length === 0) continue;
-                this.renderReloadGroup(el, labels[key] || key, items, oldNames, removedNames);
-            }
-            if (removedNames.size > 0) {
-                const section = el.createDiv({ cls: 'pi-reload-section pi-reload-section-removed' });
-                section.createSpan({ cls: 'pi-reload-label', text: '已移除' });
-                section.createSpan({ cls: 'pi-reload-count', text: String(removedNames.size) });
-                const itemsWrap = el.createDiv({ cls: 'pi-reload-items' });
-                for (const n of removedNames) {
-                    const itemEl = itemsWrap.createSpan({ cls: 'pi-reload-item pi-reload-item-removed' });
-                    itemEl.setText(n);
-                }
-            }
-            if (removedNames.size === 0 && ![...newNames].some(n => !oldNames.has(n))) {
-                const note = el.createDiv({ cls: 'pi-reload-note' });
-                note.setText('无变化');
-            }
-        });
-        // 保存新数据供下次对比
-        this.previousCmdNames = new Set(cmds.map((c: any) => c.name));
-        this.previousCmdList = cmds.map((c: any) => ({ name: c.name, source: c.source || 'other' }));
-        this.lastRawCommands = cmds;
-    }
-
-    // ── /reload 失败回退：显示缓存数据 ──
-    private handleReloadFallback(
-        oldCmdList: { name: string; source: string }[],
-        oldNames: Set<string>,
-    ): void {
-        // 用局部变量展示缓存数据，不修改 this.previousCmdNames / this.previousCmdList
-        if (oldCmdList.length > 0) {
-            this.addSystemMessage('refresh-cw', 'Pi 已重载（命令列表未更新）', (el) => {
-                this.renderReloadFromCache(el, oldCmdList, oldNames);
-            });
-        } else {
-            this.addSystemMessage('refresh-cw', 'Pi 已重载', (el) => {
-                el.createDiv({ cls: 'pi-reload-note', text: '未能获取命令列表，请检查 pi 是否正常运行' });
-            });
-        }
-    }
-
-    // ── 从当前 pi 进程获取命令列表作为对比基准 ──
-    private async fetchCurrentCmdNames(): Promise<Set<string>> {
-        try {
-            const resp = await this.piClient.sendAndWait<GetCommandsData>({ type: 'get_commands' });
-            if (resp?.success && resp.data?.commands) {
-                const cmds: any[] = resp.data.commands;
-                return new Set(cmds.map((c: any) => c.name));
-            }
-        } catch { }
-        return new Set<string>();
-    }
-
-    // ── 用缓存数据渲染 reload 消息（get_commands 失败时回退） ──
-    private renderReloadFromCache(
-        el: HTMLElement,
-        cmds: { name: string; source: string }[],
-        oldNames: Set<string>,
-    ): void {
-        const groups = new Map<string, { name: string; source: string }[]>();
-        for (const c of cmds) {
-            if (!groups.has(c.source)) groups.set(c.source, []);
-            groups.get(c.source)!.push(c);
-        }
-        const labels: Record<string, string> = {
-            extension: '扩展', skill: '技能', prompt: '模板',
-            model: '模型', tool: '工具', other: '其他',
-        };
-        const order = ['extension', 'skill', 'prompt', 'tool', 'model'];
-        const emptyRemoved = new Set<string>();
-        for (const key of order) {
-            const items = groups.get(key);
-            if (!items || items.length === 0) continue;
-            this.renderReloadGroup(el, labels[key] || key, items, oldNames, emptyRemoved);
-            groups.delete(key);
-        }
-        for (const [key, items] of groups.entries()) {
-            if (items.length === 0) continue;
-            this.renderReloadGroup(el, labels[key] || key, items, oldNames, emptyRemoved);
-        }
-        const note = el.createDiv({ cls: 'pi-reload-note' });
-        note.setText('↑ 命令列表未刷新，显示上次加载的内容');
-    }
-
-    // ── 渲染 reload 分组 ──────────────────────
-    private renderReloadGroup(
-        el: HTMLElement,
-        label: string,
-        items: { name: string; source: string }[],
-        oldNames: Set<string>,
-        removedNames: Set<string>,
-    ): void {
-        const section = el.createDiv({ cls: 'pi-reload-section' });
-        section.createSpan({ cls: 'pi-reload-label', text: label });
-        section.createSpan({ cls: 'pi-reload-count', text: String(items.length) });
-        const itemsWrap = el.createDiv({ cls: 'pi-reload-items' });
-        for (const item of items) {
-            const isNew = !oldNames.has(item.name);
-            const isRemoved = removedNames.has(item.name);
-            const itemEl = itemsWrap.createSpan({ cls: 'pi-reload-item' });
-            itemEl.setText(item.name);
-            if (isNew) {
-                itemEl.addClass('pi-reload-item-new');
-                removedNames.delete(item.name);
-            }
-            if (isRemoved) {
-                itemEl.addClass('pi-reload-item-removed');
-            }
-        }
-    }
-
-    // ── 构建扩展扫描目录列表 ──
-    // 匹配 pi 的扩展搜索目录：全局 ~/.pi/agent/extensions + 项目 .pi/extensions + 配置路径
-    private buildScanDirs(): string[] {
-        const dirs: string[] = [
-            path.join(os.homedir(), '.pi', 'agent', 'extensions'),   // 全局
-            path.join(this.vaultPath, '.pi', 'extensions'),           // 项目默认
-        ];
-        const extra = this.settings.extensionPaths;
-        if (extra) {
-            for (const p of extra.split(',')) {
-                const trimmed = p.trim();
-                if (trimmed) dirs.push(path.resolve(this.vaultPath, trimmed));
-            }
-        }
-        return dirs;
-    }
-
-    // ── 发现扩展（磁盘扫描 + get_commands 交叉验证） ──
-    private buildExtensionInfo(): ExtensionInfo[] {
-        return discoverExtensions(this.lastRawCommands, this.buildScanDirs());
     }
 }

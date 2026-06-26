@@ -5,7 +5,7 @@ import { setIcon } from 'obsidian';
 export interface CommandItem {
     name: string;
     description?: string;
-    source: 'extension' | 'prompt' | 'skill';
+    source: 'extension' | 'prompt' | 'skill' | (string & {});
     location?: string;
     path?: string;
 }
