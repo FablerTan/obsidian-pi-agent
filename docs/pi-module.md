@@ -17,7 +17,8 @@
 | `sendAndWait<T>(command, opts?)` | 发送命令并返回 Promise\<PiResponse\<T\>\>，等待对应 response |
 | `prompt(message)` | 快捷发送 `{ type: 'prompt', message }` |
 | `getSessionStats()` | 快捷调用 `get_session_stats` RPC |
-| `setAutoCompaction(enabled)` | 启用/禁用自动压缩 |
+| `setAutoCompaction(enabled)` | 启用/禁用自动压缩（发送 RPC） |
+| `setAutoCompactionSilent(enabled)` | 预设自动压缩值，不发送 RPC（`start()` / `restart()` 后自动应用） |
 | `sendExtensionUIResponse(id, data)` | 发送 Extension UI 交互响应 |
 
 | 事件订阅 | 说明 |
@@ -84,7 +85,7 @@ stdout 'data' 事件 → buffer 累积 → processLines() 按 \n 切分
 
 | 导出 | 说明 |
 |------|------|
-| `PiEvent` | 事件 discriminated union（17 种事件类型） |
+| `PiEvent` | 事件 discriminated union（18 种事件类型） |
 | `AssistantMessageEvent` | 流式 delta 联合（12 种子类型） |
 | `ExtensionUiRequest` | Extension UI 请求联合（9 种方法） |
 | `PiResponse<T>` | 命令响应泛型 |

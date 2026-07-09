@@ -8,7 +8,7 @@
 |------|------|------|
 | `session-file-reader.ts` | `readSessions(app): Promise<SessionEntry[]>` | 异步读取 pi 会话文件列表（隔离格式耦合） |
 | `extension-loader.ts` | `discoverExtensions(cmds, dirs): Promise<ExtensionInfo[]>` | 磁盘扫描 + get_commands 交叉扩展发现（异步） |
-| `pi-settings.ts` | `readCompactionSettings`, `writeCompactionSettings`(async), `readResourcePaths`, `writeResourcePaths`(async) | 读写项目 `.pi/settings.json` |
+| `pi-settings.ts` | `readCompactionSettings(projectPath)`, `writeCompactionSettings(settings, projectPath)`(async), `readResourcePaths(projectPath)`, `writeResourcePaths(projectPath, paths)`(async) | 读写项目 `.pi/settings.json` |
 | `detect-pi.ts` | `detectPiPath(): string \| null` | 自动检测 pi 可执行文件路径 |
 
 ### `session-file-reader.ts`

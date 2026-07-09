@@ -9,7 +9,7 @@
 
 ---
 
-## 1. `PiChatView.ts` — 聊天面板核心（576 行）
+## 1. `PiChatView.ts` — 聊天面板核心（578 行）
 
 **职责**：Obsidian 右侧栏的聊天面板生命周期、UI 构建、事件分发、阶段状态机。
 
@@ -67,8 +67,8 @@ turn_*/message_*/auto_retry_*/queue_update → 暂未处理（空 case）
   └── .pi-chat-container
         ├── .pi-chat-messages (消息列表，可滚动)
         └── .pi-chat-input-area (贴底)
-              ├── .pi-ext-inline-container
               ├── .pi-command-menu
+              ├── .pi-ext-inline-container
               ├── .pi-chat-note-bar
               │     ├── .pi-chat-note-left (pin + 笔记名)
               │     └── .pi-chat-selection-info
@@ -213,11 +213,11 @@ class CommandRouter {
 
 读取 pi 会话文件、显示 iOS 风格底部浮层、切换会话。
 
-| 方法 | 说明 |
-|------|------|
-| `open()` | 异步读取会话列表 → 创建浮层 |
-| `switchToSession(path)` | 切换会话 |
-| `loadMessages(messages)` | 清空并渲染历史消息 |
+| 方法 | 可见性 | 说明 |
+|------|--------|------|
+| `open()` | public | 异步读取会话列表 → 创建浮层 |
+| `switchToSession(path)` | private | 切换会话（`open` 内部调用） |
+| `loadMessages(messages)` | private | 清空并渲染历史消息（`switchToSession` 内部调用） |
 
 **渲染**：每条 assistant 消息创建 `AssistantMessageView` → `renderFinal(message)`
 → `applyToolResult()` 填入后续 toolResult 消息。
@@ -242,14 +242,14 @@ class CommandRouter {
 
 显示当前模型名和思考层级，支持交互切换。
 
-| 方法 | 说明 |
-|------|------|
-| `loadState()` | 通过 `get_state` 加载状态 |
-| `openModelPicker()` | 弹出模型选择列表 |
-| `selectModel(model)` | 选择模型（发 `set_model` RPC） |
-| `cycleThinking()` | 循环切换思考层级 |
-| `updateContextUsage()` | 更新 Token 用量显示 |
-| `destroy()` | 清理 activeDocument 点击监听器 |
+| 方法 | 可见性 | 说明 |
+|------|--------|------|
+| `updateContextUsage()` | public | 更新 Token 用量显示 |
+| `destroy()` | public | 清理 activeDocument 点击监听器 |
+| `loadState()` | private | 通过 `get_state` 加载状态 |
+| `openModelPicker()` | private | 弹出模型选择列表 |
+| `selectModel(model)` | private | 选择模型（发 `set_model` RPC） |
+| `cycleThinking()` | private | 循环切换思考层级 |
 
 ---
 
