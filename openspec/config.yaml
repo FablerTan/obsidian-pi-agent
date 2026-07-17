@@ -1,0 +1,23 @@
+schema: spec-driven
+
+context: |
+  Obsidian 桌面端插件：右侧栏聊天面板，通过 child_process.spawn 启动
+  `pi --mode rpc` 子进程，用 stdin/stdout JSONL 协议通信。
+  语言 TypeScript（esbuild 编译为 main.js），仅桌面端（依赖 Node fs/path/os/child_process）。
+  变量/函数/类型用中文注释说明；Git 提交信息中文、简洁说明改动。
+  设计原则：单一职责拆分到 src/ui 与 src/pi 协作服务；流式与历史回放
+  共用 AssistantMessageView 保证 DOM 一致；PiEvent/ExtensionUiRequest
+  用 discriminated union 获得类型 narrowing；pi 内部存储格式（session
+  文件、JSONL）集中在 SessionFileReader；所有文件系统操作使用 fs/promises；
+  事件订阅 on() 支持多视图；.pi/settings.json 为运行时配置单一真相源，
+  Obsidian 设置面板仅是其编辑器。
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
